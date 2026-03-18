@@ -9,14 +9,18 @@ export default function Login() {
     e.preventDefault();
     
     const formData = new FormData(e.currentTarget);
-    const email = formData.get('email');
+    const email = String(formData.get('email')).trim().toLowerCase(); // แปลงเป็นตัวเล็กทั้งหมดและตัดช่องว่าง
     const password = formData.get('password');
 
     // Check for admin credentials
-    if (email === 'Admin@gmail.com' && password === 'admin123') {
+    if (email === 'admin@gmail.com' && password === 'admin123') {
+      // เก็บสถานะไว้ใน localStorage ว่าคนนี้คือ admin
+      localStorage.setItem('userRole', 'admin');
       navigate('/admin');
     } else {
       // In a real app, authenticate here
+      // เก็บสถานะไว้ใน localStorage ว่าคนนี้คือ user ทั่วไป
+      localStorage.setItem('userRole', 'user');
       navigate('/dashboard');
     }
   };
@@ -49,7 +53,7 @@ export default function Login() {
                   autoComplete="email"
                   required
                   className="appearance-none relative block w-full px-3 py-3 pl-10 border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-colors text-text-light dark:text-text-dark"
-                  placeholder="jane@example.com"
+                  placeholder="admin@gmail.com"
                 />
               </div>
             </div>

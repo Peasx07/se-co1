@@ -1,9 +1,16 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'; // เพิ่ม useNavigate
 import { LayoutDashboard, Calendar, Users, CreditCard, Settings, LogOut, Bell, Search, Shield, Building, BarChart, CalendarCheck, IdCard, Receipt } from 'lucide-react';
 
 export default function DashboardLayout() {
   const location = useLocation();
+  const navigate = useNavigate(); // เรียกใช้งาน useNavigate
   const isAdmin = location.pathname.includes('/admin');
+
+  // ฟังก์ชันสำหรับ Sign Out
+  const handleLogout = () => {
+    localStorage.removeItem('userRole'); // ลบสิทธิ์การเข้าถึง
+    navigate('/login'); // เด้งกลับไปหน้า Login
+  };
 
   const navItems = isAdmin ? [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
@@ -63,7 +70,11 @@ export default function DashboardLayout() {
               <p className="text-xs text-text-muted-light dark:text-text-muted-dark truncate">{isAdmin ? 'System Admin' : 'Premium Member'}</p>
             </div>
           </div>
-          <button className="w-full mt-2 flex items-center gap-3 px-3 py-2 text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          {/* เพิ่ม onClick={handleLogout} ตรงปุ่มนี้ */}
+          <button 
+            onClick={handleLogout}
+            className="w-full mt-2 flex items-center gap-3 px-3 py-2 text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
             <LogOut className="w-5 h-5" />
             Sign Out
           </button>
