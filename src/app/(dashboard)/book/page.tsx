@@ -1,13 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Calendar as CalendarIcon, Clock, MapPin, Info, Check, Loader2 } from 'lucide-react';
 
-export default function Book() {
-  const [selectedTab, setSelectedTab] = useState('hot-desk');
+function BookContent() {
+  const searchParams = useSearchParams();
+  
+  // 🔴 ดึงข้อมูลทั้งหมดจาก URL ถ้าไม่มีให้ใช้ค่าเริ่มต้น
+  const spaceName = searchParams.get('name') || 'Downtown Executive Suite';
+  const spaceImage = searchParams.get('image') || 'https://picsum.photos/seed/downtown/1200/400';
+  const spacePrice = searchParams.get('price') || '$25.00';
+  
+  // แปลง type จาก URL ให้ตรงกับ id ของ tab อัตโนมัติ
+  const rawType = searchParams.get('type');
+  let defaultTab = 'hot-desk';
+  if (rawType === 'Dedicated Desk') defaultTab = 'dedicated';
+  if (rawType === 'Private Office') defaultTab = 'office';
+  if (rawType === 'Meeting Room') defaultTab = 'meeting';
+
+  const [selectedTab, setSelectedTab] = useState(defaultTab);
   const [selectedDesk, setSelectedDesk] = useState<string | null>(null);
   
-  // เพิ่ม State สำหรับฟอร์มและการจอง
   const [date, setDate] = useState('2023-09-15');
   const [startTime, setStartTime] = useState('09:00 AM');
   const [endTime, setEndTime] = useState('05:00 PM');
@@ -21,25 +35,20 @@ export default function Book() {
     { id: 'meeting', label: 'Meeting Room' },
   ];
 
-  // Mock desk layout
   const desks = Array.from({ length: 24 }, (_, i) => ({
     id: `desk-${i + 1}`,
     status: i % 5 === 0 ? 'occupied' : 'available',
     label: `D${i + 1}`
   }));
 
-  // ฟังก์ชันจำลองการกดจอง
   const handleBooking = () => {
     setIsBooking(true);
-    
-    // จำลองการยิง API 1.5 วินาที
     setTimeout(() => {
       setIsBooking(false);
       setIsSuccess(true);
     }, 1500);
   };
 
-  // ฟังก์ชันรีเซ็ตเพื่อจองใหม่
   const resetBooking = () => {
     setIsSuccess(false);
     setSelectedDesk(null);
@@ -47,11 +56,11 @@ export default function Book() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Hero Header */}
+      {/* Hero Header - 🔴 แสดงรูปและชื่อของสถานที่ที่กดมา */}
       <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden mb-8">
         <img 
-          src="https://picsum.photos/seed/downtown/1200/400" 
-          alt="Downtown Hub" 
+          src={spaceImage} 
+          alt={spaceName} 
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
         />
@@ -59,18 +68,17 @@ export default function Book() {
         <div className="absolute bottom-0 left-0 p-6 md:p-8 text-white">
           <div className="flex items-center gap-2 text-sm font-medium mb-2 opacity-90">
             <MapPin className="w-4 h-4" />
-            Downtown Hub
+            {spaceName}
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold">Downtown Executive Suite</h1>
+          <h1 className="text-3xl md:text-4xl font-bold">{spaceName}</h1>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column - Selection */}
         <div className="lg:col-span-2 space-y-8">
           {/* Space Type Tabs */}
           <section>
-            <h2 className="text-xl font-bold mb-4">Select Your Space</h2>
+            <h2 className="text-xl font-bold mb-4">Type Space</h2>
             <div className="flex overflow-x-auto hide-scrollbar gap-2 p-1 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl">
               {tabs.map((tab) => (
                 <button
@@ -110,7 +118,6 @@ export default function Book() {
             
             <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl p-6 overflow-x-auto">
               <div className="min-w-[500px]">
-                {/* Mock Floor Plan Layout */}
                 <div className="grid grid-cols-8 gap-4">
                   {desks.map((desk) => {
                     const isSelected = selectedDesk === desk.id;
@@ -119,7 +126,7 @@ export default function Book() {
                     return (
                       <button
                         key={desk.id}
-                        disabled={isOccupied || isSuccess} // ปิดปุ่มถ้าจองสำเร็จแล้ว
+                        disabled={isOccupied || isSuccess}
                         onClick={() => setSelectedDesk(desk.id)}
                         className={`
                           aspect-square rounded-xl flex items-center justify-center text-sm font-medium transition-all
@@ -137,7 +144,6 @@ export default function Book() {
                   })}
                 </div>
                 
-                {/* Room Elements */}
                 <div className="mt-8 flex justify-between items-center px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-sm text-text-muted-light dark:text-text-muted-dark font-medium">
                   <span>Entrance</span>
                   <span>Lounge Area</span>
@@ -152,7 +158,6 @@ export default function Book() {
         <div className="lg:col-span-1">
           <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl p-6 sticky top-24">
             
-            {/* แสดง UI สำเร็จถ้าจองผ่าน */}
             {isSuccess ? (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -165,12 +170,16 @@ export default function Book() {
                 
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-left mb-6 text-sm space-y-2">
                   <div className="flex justify-between">
+                    <span className="text-text-muted-light dark:text-text-muted-dark">Location:</span>
+                    <span className="font-medium text-right">{spaceName}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-text-muted-light dark:text-text-muted-dark">Time:</span>
                     <span className="font-medium">{startTime} - {endTime}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-text-muted-light dark:text-text-muted-dark">Amount Paid:</span>
-                    <span className="font-medium text-primary">$25.00</span>
+                    <span className="font-medium text-primary">{spacePrice}</span>
                   </div>
                 </div>
 
@@ -182,7 +191,6 @@ export default function Book() {
                 </button>
               </div>
             ) : (
-              // แสดงฟอร์มปกติถ้ายังไม่ได้จอง
               <>
                 <h2 className="text-xl font-bold mb-6">Booking Details</h2>
                 
@@ -237,6 +245,11 @@ export default function Book() {
                     <h3 className="font-medium mb-3">Summary</h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
+                        <span className="text-text-muted-light dark:text-text-muted-dark">Location</span>
+                        {/* 🔴 แสดงชื่อสถานที่ตามที่กดมา */}
+                        <span className="font-medium">{spaceName}</span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-text-muted-light dark:text-text-muted-dark">Space Type</span>
                         <span className="font-medium">{tabs.find(t => t.id === selectedTab)?.label}</span>
                       </div>
@@ -244,17 +257,14 @@ export default function Book() {
                         <span className="text-text-muted-light dark:text-text-muted-dark">Desk Selection</span>
                         <span className="font-medium">{selectedDesk ? `Desk ${selectedDesk.split('-')[1]}` : 'Not selected'}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-text-muted-light dark:text-text-muted-dark">Duration</span>
-                        <span className="font-medium">8 Hours</span>
-                      </div>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-border-light dark:border-border-dark">
                     <div className="flex justify-between items-center mb-6">
                       <span className="font-bold text-lg">Total</span>
-                      <span className="font-bold text-2xl text-primary">$25.00</span>
+                      {/* 🔴 แสดงราคาตามสถานที่ที่กดมา */}
+                      <span className="font-bold text-2xl text-primary">{spacePrice}</span>
                     </div>
                     
                     <button 
@@ -286,5 +296,14 @@ export default function Book() {
         </div>
       </div>
     </div>
+  );
+}
+
+// สร้าง Wrapper ครอบด้วย Suspense 
+export default function BookPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading Booking Details...</div>}>
+      <BookContent />
+    </Suspense>
   );
 }

@@ -2,45 +2,38 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-// เอา useRouter ออกเพราะเราไม่ได้เปลี่ยนหน้าแล้ว
 import { 
-  Calendar, Clock, MapPin, CreditCard, ArrowRight, 
+  Calendar as CalendarIcon, Clock, MapPin, CreditCard, ArrowRight, 
   MoreHorizontal, Users, IdCard, CalendarCheck, 
   CalendarPlus, UserPlus, Map, 
   Edit, Trash2, X 
 } from 'lucide-react';
 
-// สร้าง Type เผื่อไว้ให้โค้ดอ่านง่าย
 type Booking = {
   id: number;
   type: string;
-  day: number;
-  month: string;
-  time: string;
+  date: string;
+  startTime: string;
+  endTime: string;
   location: string;
 };
 
 export default function Dashboard() {
-  // 1. สร้าง State เก็บข้อมูลการจอง
   const [bookings, setBookings] = useState<Booking[]>([
-    { id: 1, type: 'Hot Desk', day: 15, month: 'Sep', time: '09:00 AM - 05:00 PM', location: 'Downtown Hub' },
-    { id: 2, type: 'Meeting Room A', day: 16, month: 'Sep', time: '09:00 AM - 05:00 PM', location: 'Downtown Hub' }
+    { id: 1, type: 'Hot Desk', date: '2026-09-15', startTime: '09:00', endTime: '17:00', location: 'Downtown Hub' },
+    { id: 2, type: 'Meeting Room A', date: '2026-09-16', startTime: '09:00', endTime: '17:00', location: 'Downtown Hub' }
   ]);
 
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-
-  // State สำหรับควบคุม Popup Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
 
-  // 2. ฟังก์ชันเปิด Modal แก้ไข
   const handleEditClick = (booking: Booking) => {
-    setEditingBooking({ ...booking }); // ก๊อปปี้ข้อมูลเดิมมาใส่ฟอร์ม
-    setIsEditModalOpen(true);          // เปิด Modal
-    setOpenMenuId(null);               // ปิดเมนูจุดสามจุด
+    setEditingBooking({ ...booking });
+    setIsEditModalOpen(true);
+    setOpenMenuId(null);
   };
 
-  // ฟังก์ชันบันทึกข้อมูลหลังจากแก้ใน Modal เสร็จ
   const handleSaveChanges = () => {
     if (editingBooking) {
       setBookings(bookings.map(b => (b.id === editingBooking.id ? editingBooking : b)));
@@ -49,10 +42,31 @@ export default function Dashboard() {
     }
   };
 
-  // 3. ฟังก์ชัน Delete
   const handleDelete = (id: number) => {
     setBookings((prevBookings) => prevBookings.filter((booking) => booking.id !== id));
     setOpenMenuId(null);
+  };
+
+  const getDisplayDate = (dateStr: string) => {
+    if (!dateStr) return { day: '', month: '' };
+    const [, month, day] = dateStr.split('-');
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return {
+      day: parseInt(day),
+      month: monthNames[parseInt(month) - 1] || ''
+    };
+  };
+
+  const getDisplayTime = (start: string, end: string) => {
+    const format12h = (time24: string) => {
+      if (!time24) return '';
+      const [h, m] = time24.split(':');
+      const hours = parseInt(h);
+      const suffix = hours >= 12 ? 'PM' : 'AM';
+      const hour12 = hours % 12 || 12;
+      return `${hour12.toString().padStart(2, '0')}:${m} ${suffix}`;
+    };
+    return `${format12h(start)} - ${format12h(end)}`;
   };
 
   return (
@@ -62,7 +76,6 @@ export default function Dashboard() {
         <p className="text-text-muted-light dark:text-text-muted-dark">Here's what's happening with your workspace today.</p>
       </div>
 
-      {/* Status Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-surface-light dark:bg-surface-dark p-6 rounded-2xl border border-border-light dark:border-border-dark">
           <div className="flex items-center gap-3 mb-4">
@@ -72,7 +85,7 @@ export default function Dashboard() {
             <h3 className="font-semibold">Membership</h3>
           </div>
           <p className="text-2xl font-bold mb-1">Resident Plan</p>
-          <p className="text-sm text-text-muted-light dark:text-text-muted-dark">Renews on Oct 1, 2023</p>
+          <p className="text-sm text-text-muted-light dark:text-text-muted-dark">Renews on Oct 1, 2026</p>
         </div>
         
         <div className="bg-surface-light dark:bg-surface-dark p-6 rounded-2xl border border-border-light dark:border-border-dark">
@@ -99,9 +112,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Upcoming Bookings */}
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Upcoming Bookings</h2>
@@ -109,55 +120,57 @@ export default function Dashboard() {
             </div>
             <div className="bg-surface-light dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark">
               
-              {/* 4. วนลูปจาก State bookings */}
               {bookings.length > 0 ? (
-                bookings.map((booking) => (
-                  <div key={booking.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border-light dark:border-border-dark last:border-0 relative">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl flex flex-col items-center justify-center shrink-0">
-                        <span className="text-xs font-medium text-text-muted-light dark:text-text-muted-dark uppercase">{booking.month}</span>
-                        <span className="text-xl font-bold">{booking.day}</span>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-lg">{booking.type}</h3>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-text-muted-light dark:text-text-muted-dark mt-1">
-                          <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {booking.time}</span>
-                          <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {booking.location}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* ปุ่มจุดสามจุดและ Dropdown Menu */}
-                    <div>
-                      <button 
-                        onClick={() => setOpenMenuId(openMenuId === booking.id ? null : booking.id)}
-                        className="p-2 text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus:outline-none"
-                      >
-                        <MoreHorizontal className="w-5 h-5" />
-                      </button>
+                bookings.map((booking) => {
+                  const { day, month } = getDisplayDate(booking.date);
+                  const displayTime = getDisplayTime(booking.startTime, booking.endTime);
 
-                      {/* Dropdown Menu */}
-                      {openMenuId === booking.id && (
-                        <div className="absolute right-6 top-14 w-48 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-border-light dark:border-border-dark py-1 z-10 overflow-hidden">
-                          <button
-                            onClick={() => handleEditClick(booking)}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors"
-                          >
-                            <Edit className="w-4 h-4" />
-                            Edit Booking
-                          </button>
-                          <button
-                            onClick={() => handleDelete(booking.id)}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Cancel Booking
-                          </button>
+                  return (
+                    <div key={booking.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border-light dark:border-border-dark last:border-0 relative">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl flex flex-col items-center justify-center shrink-0">
+                          <span className="text-xs font-medium text-text-muted-light dark:text-text-muted-dark uppercase">{month}</span>
+                          <span className="text-xl font-bold">{day}</span>
                         </div>
-                      )}
+                        <div>
+                          <h3 className="font-bold text-lg">{booking.type}</h3>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-text-muted-light dark:text-text-muted-dark mt-1">
+                            <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {displayTime}</span>
+                            <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {booking.location}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <button 
+                          onClick={() => setOpenMenuId(openMenuId === booking.id ? null : booking.id)}
+                          className="p-2 text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus:outline-none"
+                        >
+                          <MoreHorizontal className="w-5 h-5" />
+                        </button>
+
+                        {openMenuId === booking.id && (
+                          <div className="absolute right-6 top-14 w-48 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-border-light dark:border-border-dark py-1 z-10 overflow-hidden">
+                            <button
+                              onClick={() => handleEditClick(booking)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit Booking
+                            </button>
+                            <button
+                              onClick={() => handleDelete(booking.id)}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Cancel Booking
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-8 text-center text-text-muted-light dark:text-text-muted-dark">
                   No upcoming bookings.
@@ -166,7 +179,6 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* Current Hub Location */}
           <section>
             <h2 className="text-xl font-bold mb-4">Current Hub Location</h2>
             <div className="bg-surface-light dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark overflow-hidden">
@@ -192,9 +204,7 @@ export default function Dashboard() {
           </section>
         </div>
 
-        {/* Right Column */}
         <div className="space-y-8">
-          {/* Quick Actions */}
           <section>
             <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -225,7 +235,6 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* Community Events */}
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Community</h2>
@@ -255,86 +264,101 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- Popup Modal สำหรับ Edit --- */}
+      {/* --- Popup Modal สำหรับ Edit (User) --- */}
       {isEditModalOpen && editingBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             {/* Header */}
-            <div className="flex justify-between items-center p-6 border-b border-border-light dark:border-border-dark">
+            <div className="flex justify-between items-center p-6 pb-4">
               <h2 className="text-xl font-bold">Edit Booking</h2>
               <button 
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-full transition-colors"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+            
+            <div className="w-full h-[1px] bg-gray-100 dark:bg-border-dark mb-4"></div>
 
             {/* ฟอร์มแก้ไข */}
-            <div className="p-6 space-y-4">
+            <div className="px-6 pb-6 space-y-5">
+              
+              {/* 1. Location (เป็น Dropdown List) */}
               <div>
-                <label className="block text-sm font-medium mb-1.5">Space Type</label>
-                <input 
-                  type="text" 
-                  value={editingBooking.type}
-                  onChange={(e) => setEditingBooking({...editingBooking, type: e.target.value})}
-                  className="w-full px-3 py-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
+                <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Location</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <select 
+                    value={editingBooking.location}
+                    onChange={(e) => setEditingBooking({...editingBooking, location: e.target.value})}
+                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none"
+                  >
+                    <option value="Downtown Hub">Downtown Hub</option>
+                    <option value="Tech Park">Tech Park</option>
+                    <option value="Creative District">Creative District</option>
+                    <option value="Innovation Lab">Innovation Lab</option>
+                  </select>
+                </div>
               </div>
               
+              {/* 2. Date */}
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Date</label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input 
+                    type="date" 
+                    value={editingBooking.date}
+                    onChange={(e) => setEditingBooking({...editingBooking, date: e.target.value})}
+                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none"
+                  />
+                </div>
+              </div>
+
+              {/* 3. Time (Start & End) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Day</label>
-                  <input 
-                    type="number" 
-                    value={editingBooking.day}
-                    onChange={(e) => setEditingBooking({...editingBooking, day: parseInt(e.target.value) || 1})}
-                    className="w-full px-3 py-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
+                  <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Start Time</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="time" 
+                      value={editingBooking.startTime}
+                      onChange={(e) => setEditingBooking({...editingBooking, startTime: e.target.value})}
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Month</label>
-                  <input 
-                    type="text" 
-                    value={editingBooking.month}
-                    onChange={(e) => setEditingBooking({...editingBooking, month: e.target.value})}
-                    className="w-full px-3 py-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
+                  <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">End Time</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="time" 
+                      value={editingBooking.endTime}
+                      onChange={(e) => setEditingBooking({...editingBooking, endTime: e.target.value})}
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Time</label>
-                <input 
-                  type="text" 
-                  value={editingBooking.time}
-                  onChange={(e) => setEditingBooking({...editingBooking, time: e.target.value})}
-                  className="w-full px-3 py-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Location</label>
-                <input 
-                  type="text" 
-                  value={editingBooking.location}
-                  onChange={(e) => setEditingBooking({...editingBooking, location: e.target.value})}
-                  className="w-full px-3 py-2 bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                />
-              </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-6 border-t border-border-light dark:border-border-dark bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-3">
+            <div className="w-full h-[1px] bg-gray-100 dark:bg-border-dark"></div>
+
+            {/* Footer Buttons */}
+            <div className="p-6 flex justify-end gap-3">
               <button 
                 onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium border border-border-light dark:border-border-dark rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="px-5 py-2.5 text-sm font-semibold border border-gray-300 dark:border-border-dark rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSaveChanges}
-                className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+                className="px-5 py-2.5 text-sm font-semibold bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-lg transition-colors shadow-sm"
               >
                 Save Changes
               </button>
@@ -342,7 +366,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

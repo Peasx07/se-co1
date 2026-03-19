@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Star, ArrowRight } from 'lucide-react';
+import { MapPin, Star } from 'lucide-react';
 import Link from 'next/link';
 
 export default function UserSpaces() {
@@ -38,7 +38,6 @@ export default function UserSpaces() {
         {spaces.map((space) => (
           <div key={space.id} className="bg-surface-light dark:bg-surface-dark rounded-2xl overflow-hidden border border-border-light dark:border-border-dark flex flex-col">
             <div className="h-48 relative">
-              {/* เปลี่ยน src เป็น space.image เพื่อใช้ลิงก์จาก Array โดยตรง */}
               <img src={space.image} alt={space.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               <div className="absolute top-3 right-3 bg-white/90 dark:bg-black/90 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-sm font-medium">
                 <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
@@ -56,7 +55,11 @@ export default function UserSpaces() {
               </div>
               <div className="mt-auto flex justify-between items-center pt-4 border-t border-border-light dark:border-border-dark">
                 <span className="font-semibold">{space.price}</span>
-                <Link href="/book" className="bg-primary/10 text-primary hover:bg-primary hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                {/* 🔴 ส่งค่า name, image, type และ price ไปที่หน้า /book */}
+                <Link 
+                  href={`/book?name=${encodeURIComponent(space.name)}&image=${encodeURIComponent(space.image)}&type=${encodeURIComponent(space.type)}&price=${encodeURIComponent(space.price)}`}
+                  className="bg-primary/10 text-primary hover:bg-primary hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
                   Book Now
                 </Link>
               </div>
