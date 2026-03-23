@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Filter, MoreVertical, Edit, Trash2, X, Calendar as CalendarIcon, Clock, MapPin, CheckCircle2 } from 'lucide-react';
+// ✅ เพิ่ม Activity, DollarSign, TrendingUp สำหรับการ์ดสถิติ
+import { Search, Filter, MoreVertical, Edit, Trash2, X, Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, Activity, DollarSign, TrendingUp } from 'lucide-react';
 import axios from 'axios';
 
 type Booking = {
@@ -23,7 +24,7 @@ export default function AdminBookings() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
 
-  // ✅ 1. ดึงข้อมูลการจองของ "ทุกคน" (Admin View Any Booking - ข้อ 10)
+  // ✅ 1. ดึงข้อมูลการจองของ "ทุกคน" (Admin View Any Booking)
   const fetchBookings = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -67,7 +68,7 @@ export default function AdminBookings() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ✅ 2. ลบการจองของใครก็ได้ (Admin Delete Any Booking - ข้อ 12)
+  // ✅ 2. ลบการจองของใครก็ได้ (Admin Delete Any Booking)
   const handleDelete = async (id: string) => {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบการจองนี้? (การลบในฐานะ Admin)')) return;
     try {
@@ -90,7 +91,7 @@ export default function AdminBookings() {
     setOpenMenuId(null);
   };
 
-  // ✅ 3. แก้ไขการจองของใครก็ได้ (Admin Edit Any Booking - ข้อ 11)
+  // ✅ 3. แก้ไขการจองของใครก็ได้ (Admin Edit Any Booking)
   const handleSaveChanges = async () => {
     if (editingBooking) {
       try {
@@ -129,6 +130,29 @@ export default function AdminBookings() {
     return `${format12h(start)} - ${format12h(end)}`;
   };
 
+  // --- 📊 คำนวณสถิติ Dashboard อัตโนมัติจากข้อมูล Bookings ---
+  
+  // 1. หาจำนวนคิวที่กำลัง Active อยู่
+  const activeBookingsCount = bookings.filter(b => b.status === 'Active').length;
+  
+  // 2. จำลองรายได้ (สมมติให้เฉลี่ยคิวละ ฿1,500 เพื่อให้เห็นตัวเลขสวยๆ)
+  const monthlyRevenue = bookings.length * 1500;
+  
+  // 3. หาสถานที่ยอดฮิต (นับซ้ำเยอะสุด)
+  const locationCounts = bookings.reduce((acc, curr) => {
+    // ป้องกันกรณีที่ไม่มี location
+    if(curr.location !== 'Unknown Location') {
+      acc[curr.location] = (acc[curr.location] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const popularSpace = Object.keys(locationCounts).length > 0 
+    ? Object.keys(locationCounts).reduce((a, b) => locationCounts[a] > locationCounts[b] ? a : b) 
+    : 'No Data Yet';
+
+  // -----------------------------------------------------
+
   return (
     <div className="space-y-6 relative">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -151,6 +175,43 @@ export default function AdminBookings() {
         </div>
       </div>
 
+      {/* 🔴 Dashboard Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Card 1: Active Bookings */}
+        <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
+            <Activity className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-text-muted-light dark:text-text-muted-dark font-medium">Active Bookings</p>
+            <h3 className="text-2xl font-bold">{activeBookingsCount}</h3>
+          </div>
+        </div>
+
+        {/* Card 2: Monthly Revenue */}
+        <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+            <DollarSign className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-text-muted-light dark:text-text-muted-dark font-medium">Estimated Revenue</p>
+            <h3 className="text-2xl font-bold">฿{monthlyRevenue.toLocaleString()}</h3>
+          </div>
+        </div>
+
+        {/* Card 3: Most Popular Space */}
+        <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-text-muted-light dark:text-text-muted-dark font-medium">Popular Space</p>
+            <h3 className="text-lg font-bold truncate max-w-[150px]">{popularSpace}</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Table Section */}
       <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -167,7 +228,7 @@ export default function AdminBookings() {
             </thead>
             <tbody className="divide-y divide-border-light dark:divide-border-dark" ref={menuRef}>
               {bookings.map((booking, index) => {
-                const isBottomRow = index >= bookings.length - 2;
+                const isBottomRow = index >= bookings.length - 2 && bookings.length > 3; // ปรับเงื่อนไขไม่ให้เด้งผิดถ้าข้อมูลน้อย
                 return (
                 <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="p-4 font-medium text-sm whitespace-nowrap">
@@ -176,7 +237,7 @@ export default function AdminBookings() {
                   <td className="p-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                        {booking.user.charAt(0)}
+                        {booking.user.charAt(0).toUpperCase()}
                       </div>
                       <span className="text-sm font-medium">{booking.user}</span>
                     </div>
@@ -358,7 +419,7 @@ export default function AdminBookings() {
               </button>
               <button 
                 onClick={handleSaveChanges}
-                className="px-5 py-2.5 text-sm font-semibold bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors shadow-sm"
+                className="px-5 py-2.5 text-sm font-semibold bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-lg transition-colors shadow-sm"
               >
                 Save Changes
               </button>
