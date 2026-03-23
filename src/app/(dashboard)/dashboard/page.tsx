@@ -10,7 +10,7 @@ import {
   Edit, Trash2, X 
 } from 'lucide-react';
 
-// ✅ เปลี่ยน id เป็น string เพื่อรองรับ _id ของ MongoDB
+// 🟢 1. เพิ่มฟิลด์ desk ใน Type Booking ด้วย
 type Booking = {
   id: string;
   type: string;
@@ -18,6 +18,7 @@ type Booking = {
   startTime: string;
   endTime: string;
   location: string;
+  desk?: string; 
 };
 
 export default function Dashboard() {
@@ -26,7 +27,6 @@ export default function Dashboard() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
 
-  // ✅ 1. ดึงข้อมูลจาก Backend มาแสดงผล
   const fetchBookings = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -35,16 +35,19 @@ export default function Dashboard() {
         withCredentials: true
       });
 
-      // แปลงข้อมูลจาก Backend ให้เข้ากับ UI เดิมของคุณ
+      // 🟢 2. แมปข้อมูลใหม่ ดึง startTime และ endTime จาก Backend มาใช้ตรงๆ
       const formattedBookings = res.data.data.map((r: any) => {
-        const d = new Date(r.date);
+        // ดึงแค่วันที่ YYYY-MM-DD จาก UTC string ของ MongoDB
+        const dateStr = r.date ? new Date(r.date).toISOString().split('T')[0] : '';
+        
         return {
           id: r._id,
           type: r.coworking?.type ? r.coworking.type.charAt(0).toUpperCase() + r.coworking.type.slice(1) : 'Workspace',
-          date: !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '', // YYYY-MM-DD
-          startTime: !isNaN(d.getTime()) ? d.toTimeString().slice(0, 5) : '09:00', // HH:mm
-          endTime: !isNaN(d.getTime()) ? new Date(d.getTime() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5) : '11:00',
-          location: r.coworking?.name || 'Unknown Location'
+          date: dateStr,
+          startTime: r.startTime || '09:00', // ใช้ค่าจาก DB
+          endTime: r.endTime || '18:00',     // ใช้ค่าจาก DB
+          location: r.coworking?.name || 'Unknown Location',
+          desk: r.desk || ''                 // ใช้ค่าจาก DB
         };
       });
       setBookings(formattedBookings);
@@ -63,16 +66,18 @@ export default function Dashboard() {
     setOpenMenuId(null);
   };
 
-  // ✅ 2. อัปเดตข้อมูลไปที่ Backend (Edit)
   const handleSaveChanges = async () => {
     if (editingBooking) {
       try {
         const token = localStorage.getItem('token');
-        // นำวันที่และเวลาที่แก้ใน Modal มารวมเป็น ISO String เพื่อส่งให้ Backend
-        const isoDate = new Date(`${editingBooking.date}T${editingBooking.startTime}:00`).toISOString();
-
+        
+        // 🟢 3. ส่งข้อมูลไปอัปเดต ต้องส่งทั้ง date, startTime, endTime เข้าไป
         await axios.put(`http://localhost:5000/api/v1/reservations/${editingBooking.id}`, 
-          { date: isoDate }, 
+          { 
+            date: editingBooking.date,
+            startTime: editingBooking.startTime,
+            endTime: editingBooking.endTime
+          }, 
           {
             headers: { Authorization: `Bearer ${token}` },
             withCredentials: true
@@ -81,7 +86,7 @@ export default function Dashboard() {
 
         setIsEditModalOpen(false);
         setEditingBooking(null);
-        fetchBookings(); // โหลดข้อมูลใหม่
+        fetchBookings(); // โหลดข้อมูลใหม่หลังจากแก้เสร็จ
         alert('อัปเดตการจองสำเร็จ!');
       } catch (err) {
         console.error(err);
@@ -90,7 +95,6 @@ export default function Dashboard() {
     }
   };
 
-  // ✅ 3. ลบข้อมูลใน Backend (Delete)
   const handleDelete = async (id: string) => {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะยกเลิกการจองนี้?')) return;
     try {
@@ -131,7 +135,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 relative">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Welcome back, Alex</h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Welcome back</h1>
         <p className="text-text-muted-light dark:text-text-muted-dark">Here's what's happening with your workspace today.</p>
       </div>
 
@@ -192,7 +196,7 @@ export default function Dashboard() {
                           <span className="text-xl font-bold">{day}</span>
                         </div>
                         <div>
-                          <h3 className="font-bold text-lg">{booking.type}</h3>
+                          <h3 className="font-bold text-lg">{booking.type} {booking.desk && <span className="text-primary text-sm ml-2">({booking.desk})</span>}</h3>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-text-muted-light dark:text-text-muted-dark mt-1">
                             <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {displayTime}</span>
                             <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {booking.location}</span>
@@ -238,6 +242,7 @@ export default function Dashboard() {
             </div>
           </section>
 
+          {/* ... (ส่วนอื่นๆ ของ Dashboard เหมือนเดิม) ... */}
           <section>
             <h2 className="text-xl font-bold mb-4">Current Hub Location</h2>
             <div className="bg-surface-light dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark overflow-hidden">
@@ -267,7 +272,7 @@ export default function Dashboard() {
           <section>
             <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-4">
-              <Link href="/book" className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl border border-border-light dark:border-border-dark hover:border-primary transition-colors flex flex-col items-center text-center gap-2">
+              <Link href="/spaces" className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl border border-border-light dark:border-border-dark hover:border-primary transition-colors flex flex-col items-center text-center gap-2">
                 <div className="w-10 h-10 bg-primary/10 text-primary rounded-full flex items-center justify-center">
                   <CalendarPlus className="w-5 h-5" />
                 </div>
@@ -293,37 +298,10 @@ export default function Dashboard() {
               </button>
             </div>
           </section>
-
-          <section>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Community</h2>
-              <Link href="/community" className="text-sm font-medium text-primary hover:underline">View All</Link>
-            </div>
-            <div className="bg-surface-light dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark p-4 space-y-4">
-              <div className="flex gap-4 items-start">
-                <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden shrink-0">
-                  <img src="https://picsum.photos/seed/event1/100/100" alt="Event" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm">Networking Mixer</h4>
-                  <p className="text-xs text-text-muted-light dark:text-text-muted-dark mt-1">Today, 5:00 PM • Main Lounge</p>
-                </div>
-              </div>
-              <div className="flex gap-4 items-start">
-                <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden shrink-0">
-                  <img src="https://picsum.photos/seed/event2/100/100" alt="Event" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm">Founder's Talk: Scaling Up</h4>
-                  <p className="text-xs text-text-muted-light dark:text-text-muted-dark mt-1">Tomorrow, 12:00 PM • Room A</p>
-                </div>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
 
-      {/* --- Popup Modal สำหรับ Edit (User) --- */}
+      {/* --- Popup Modal สำหรับ Edit --- */}
       {isEditModalOpen && editingBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -343,7 +321,7 @@ export default function Dashboard() {
             {/* ฟอร์มแก้ไข */}
             <div className="px-6 pb-6 space-y-5">
               
-              {/* 1. Location (เป็น Dropdown List) */}
+              {/* Location (Disable ไว้) */}
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Location</label>
                 <div className="relative">
@@ -351,16 +329,15 @@ export default function Dashboard() {
                   <select 
                     value={editingBooking.location}
                     onChange={(e) => setEditingBooking({...editingBooking, location: e.target.value})}
-                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none"
+                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none appearance-none"
                     disabled
                   >
-                    {/* ทำให้มันแสดงชื่อสถานที่จริง (Disable ไว้เพื่อกันไม่ให้แก้ชื่อข้ามสาขา) */}
-                    <option value={editingBooking.location}>{editingBooking.location}</option>
+                    <option value={editingBooking.location}>{editingBooking.location} {editingBooking.desk ? `(${editingBooking.desk})` : ''}</option>
                   </select>
                 </div>
               </div>
               
-              {/* 2. Date */}
+              {/* Date */}
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Date</label>
                 <div className="relative">
@@ -369,12 +346,12 @@ export default function Dashboard() {
                     type="date" 
                     value={editingBooking.date}
                     onChange={(e) => setEditingBooking({...editingBooking, date: e.target.value})}
-                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 appearance-none"
+                    className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-background-dark border border-gray-300 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
                   />
                 </div>
               </div>
 
-              {/* 3. Time (Start & End) */}
+              {/* Time (Start & End) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Start Time</label>
@@ -384,7 +361,7 @@ export default function Dashboard() {
                       type="time" 
                       value={editingBooking.startTime}
                       onChange={(e) => setEditingBooking({...editingBooking, startTime: e.target.value})}
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-background-dark border border-gray-300 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -396,7 +373,7 @@ export default function Dashboard() {
                       type="time" 
                       value={editingBooking.endTime}
                       onChange={(e) => setEditingBooking({...editingBooking, endTime: e.target.value})}
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-background-dark border border-gray-300 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -416,7 +393,7 @@ export default function Dashboard() {
               </button>
               <button 
                 onClick={handleSaveChanges}
-                className="px-5 py-2.5 text-sm font-semibold bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-lg transition-colors shadow-sm"
+                className="px-5 py-2.5 text-sm font-semibold bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors shadow-sm"
               >
                 Save Changes
               </button>

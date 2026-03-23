@@ -1,51 +1,55 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-// ✅ เพิ่ม Activity, DollarSign, TrendingUp สำหรับการ์ดสถิติ
 import { Search, Filter, MoreVertical, Edit, Trash2, X, Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, Activity, DollarSign, TrendingUp } from 'lucide-react';
 import axios from 'axios';
 
 type Booking = {
   id: string;
   user: string;
+  userId: string; // 🟢 เพิ่ม userId เข้ามาใน Type
   type: string;
   location: string;
   date: string;
   startTime: string;
   endTime: string;
   status: string;
+  desk?: string; 
 };
 
 export default function AdminBookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  // 🟢 เพิ่ม State สำหรับเก็บค่าการค้นหา
+  const [searchTerm, setSearchTerm] = useState('');
+  
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLTableSectionElement>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
 
-  // ✅ 1. ดึงข้อมูลการจองของ "ทุกคน" (Admin View Any Booking)
   const fetchBookings = async () => {
     try {
       const token = localStorage.getItem('token');
-      // แอดมินยิง GET /reservations ระบบ Backend จะรู้จาก Token ว่าเป็น Admin และคืนค่าของทุกคนมาให้
+      // Backend ควรตั้งค่าให้ API นี้คืนค่าทั้งหมดเมื่อเป็น Admin
       const res = await axios.get('http://localhost:5000/api/v1/reservations', {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true
       });
 
-      // แมปข้อมูลจาก Backend เข้าฟอร์แมตของตาราง UI
       const formattedBookings = res.data.data.map((r: any) => {
-        const d = new Date(r.date);
+        const dateStr = r.date ? new Date(r.date).toISOString().split('T')[0] : '';
         return {
           id: r._id,
-          user: r.user?.name || 'Unknown User', // ดึงชื่อ User จาก Populated data
+          user: r.user?.name || 'Unknown User',
+          userId: r.user?._id || '', // 🟢 ดึง userId มาจาก Backend
           type: r.coworking?.type ? r.coworking.type.charAt(0).toUpperCase() + r.coworking.type.slice(1) : 'Workspace',
           location: r.coworking?.name || 'Unknown Location',
-          date: !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '', 
-          startTime: !isNaN(d.getTime()) ? d.toTimeString().slice(0, 5) : '09:00',
-          endTime: !isNaN(d.getTime()) ? new Date(d.getTime() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5) : '11:00',
-          status: 'Active' // จำลอง Status เนื่องจากใน Model ของคุณอาจจะยังไม่มี Field status ของ Reservation
+          date: dateStr,
+          startTime: r.startTime || '09:00',
+          endTime: r.endTime || '18:00',
+          desk: r.desk || '',
+          status: 'Active' 
         };
       });
       setBookings(formattedBookings);
@@ -68,7 +72,6 @@ export default function AdminBookings() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ✅ 2. ลบการจองของใครก็ได้ (Admin Delete Any Booking)
   const handleDelete = async (id: string) => {
     if (!confirm('คุณแน่ใจใช่ไหมที่จะลบการจองนี้? (การลบในฐานะ Admin)')) return;
     try {
@@ -77,7 +80,6 @@ export default function AdminBookings() {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true
       });
-      // ลบออกจาก State ทันทีที่ลบใน DB สำเร็จ
       setBookings(bookings.filter(booking => booking.id !== id));
       setOpenMenuId(null);
     } catch (err) {
@@ -91,16 +93,16 @@ export default function AdminBookings() {
     setOpenMenuId(null);
   };
 
-  // ✅ 3. แก้ไขการจองของใครก็ได้ (Admin Edit Any Booking)
   const handleSaveChanges = async () => {
     if (editingBooking) {
       try {
         const token = localStorage.getItem('token');
-        // นำ Date และ Time มาประกอบกันเป็น ISO String เพื่อส่งให้ Backend
-        const isoDate = new Date(`${editingBooking.date}T${editingBooking.startTime}:00`).toISOString();
-
         await axios.put(`http://localhost:5000/api/v1/reservations/${editingBooking.id}`, 
-          { date: isoDate }, // อัปเดตฟิลด์วันที่
+          { 
+            date: editingBooking.date,
+            startTime: editingBooking.startTime,
+            endTime: editingBooking.endTime
+          },
           {
             headers: { Authorization: `Bearer ${token}` },
             withCredentials: true
@@ -109,11 +111,11 @@ export default function AdminBookings() {
 
         setIsEditModalOpen(false);
         setEditingBooking(null);
-        fetchBookings(); // ดึงข้อมูลใหม่มาแสดง
+        fetchBookings(); 
         alert('อัปเดตการจองสำเร็จ!');
       } catch (err) {
         console.error(err);
-        alert('ไม่สามารถแก้ไขข้อมูลได้ โปรดตรวจสอบว่าวันที่ถูกต้องและไม่ขัดเงื่อนไข');
+        alert('ไม่สามารถแก้ไขข้อมูลได้ โปรดตรวจสอบว่าข้อมูลถูกต้อง');
       }
     }
   };
@@ -130,17 +132,21 @@ export default function AdminBookings() {
     return `${format12h(start)} - ${format12h(end)}`;
   };
 
-  // --- 📊 คำนวณสถิติ Dashboard อัตโนมัติจากข้อมูล Bookings ---
-  
-  // 1. หาจำนวนคิวที่กำลัง Active อยู่
-  const activeBookingsCount = bookings.filter(b => b.status === 'Active').length;
-  
-  // 2. จำลองรายได้ (สมมติให้เฉลี่ยคิวละ ฿1,500 เพื่อให้เห็นตัวเลขสวยๆ)
-  const monthlyRevenue = bookings.length * 1500;
-  
-  // 3. หาสถานที่ยอดฮิต (นับซ้ำเยอะสุด)
-  const locationCounts = bookings.reduce((acc, curr) => {
-    // ป้องกันกรณีที่ไม่มี location
+  // 🟢 ฟังก์ชันสำหรับกรองข้อมูล (Filter) ตามคำค้นหา
+  const filteredBookings = bookings.filter((booking) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      booking.userId.toLowerCase().includes(searchLower) ||    // ค้นหาด้วย User ID
+      booking.user.toLowerCase().includes(searchLower) ||      // ค้นหาด้วยชื่อ User
+      booking.id.toLowerCase().includes(searchLower) ||        // ค้นหาด้วย Booking ID
+      booking.location.toLowerCase().includes(searchLower)     // ค้นหาด้วยชื่อสถานที่
+    );
+  });
+
+  // 🟢 นำ filteredBookings ไปคำนวณสถิติ เพื่อให้ตัวเลขเปลี่ยนตามการ Filter
+  const activeBookingsCount = filteredBookings.filter(b => b.status === 'Active').length;
+  const monthlyRevenue = filteredBookings.length * 1500;
+  const locationCounts = filteredBookings.reduce((acc, curr) => {
     if(curr.location !== 'Unknown Location') {
       acc[curr.location] = (acc[curr.location] || 0) + 1;
     }
@@ -149,9 +155,7 @@ export default function AdminBookings() {
   
   const popularSpace = Object.keys(locationCounts).length > 0 
     ? Object.keys(locationCounts).reduce((a, b) => locationCounts[a] > locationCounts[b] ? a : b) 
-    : 'No Data Yet';
-
-  // -----------------------------------------------------
+    : 'No Data Found';
 
   return (
     <div className="space-y-6 relative">
@@ -161,12 +165,15 @@ export default function AdminBookings() {
           <p className="text-text-muted-light dark:text-text-muted-dark">View and manage all workspace reservations across the system.</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
+          <div className="relative flex-1 sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted-light dark:text-text-muted-dark" />
+            {/* 🟢 ผูก State การค้นหากับ Input Field */}
             <input 
               type="text" 
-              placeholder="Search bookings..." 
-              className="w-full pl-9 pr-4 py-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              placeholder="Search by User ID, Name, Booking ID..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
             />
           </div>
           <button className="p-2 border border-border-light dark:border-border-dark rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -175,9 +182,8 @@ export default function AdminBookings() {
         </div>
       </div>
 
-      {/* 🔴 Dashboard Summary Cards */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1: Active Bookings */}
         <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-5 flex items-center gap-4 shadow-sm">
           <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
             <Activity className="w-6 h-6" />
@@ -188,7 +194,6 @@ export default function AdminBookings() {
           </div>
         </div>
 
-        {/* Card 2: Monthly Revenue */}
         <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-5 flex items-center gap-4 shadow-sm">
           <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
             <DollarSign className="w-6 h-6" />
@@ -199,7 +204,6 @@ export default function AdminBookings() {
           </div>
         </div>
 
-        {/* Card 3: Most Popular Space */}
         <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-5 flex items-center gap-4 shadow-sm">
           <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
             <TrendingUp className="w-6 h-6" />
@@ -211,7 +215,6 @@ export default function AdminBookings() {
         </div>
       </div>
 
-      {/* Table Section */}
       <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -227,8 +230,9 @@ export default function AdminBookings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-light dark:divide-border-dark" ref={menuRef}>
-              {bookings.map((booking, index) => {
-                const isBottomRow = index >= bookings.length - 2 && bookings.length > 3; // ปรับเงื่อนไขไม่ให้เด้งผิดถ้าข้อมูลน้อย
+              {/* 🟢 ใช้ filteredBookings ในการวนลูปแทน bookings ปกติ */}
+              {filteredBookings.map((booking, index) => {
+                const isBottomRow = index >= filteredBookings.length - 2 && filteredBookings.length > 3;
                 return (
                 <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="p-4 font-medium text-sm whitespace-nowrap">
@@ -239,10 +243,16 @@ export default function AdminBookings() {
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs shrink-0">
                         {booking.user.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium">{booking.user}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{booking.user}</span>
+                        {/* 🟢 แสดง User ID ย่อให้ Admin เห็นได้ด้วย */}
+                        <span className="text-[10px] text-gray-400">uid: {booking.userId.slice(-6)}</span>
+                      </div>
                     </div>
                   </td>
-                  <td className="p-4 text-sm text-text-muted-light dark:text-text-muted-dark whitespace-nowrap">{booking.type}</td>
+                  <td className="p-4 text-sm text-text-muted-light dark:text-text-muted-dark whitespace-nowrap">
+                    {booking.type} {booking.desk && <span className="text-[#ea580c] dark:text-[#ea580c] font-medium ml-1">({booking.desk})</span>}
+                  </td>
                   <td className="p-4 text-sm text-text-muted-light dark:text-text-muted-dark whitespace-nowrap">{booking.location}</td>
                   <td className="p-4 text-sm text-text-muted-light dark:text-text-muted-dark whitespace-nowrap">
                     {booking.date} <br/>
@@ -287,10 +297,11 @@ export default function AdminBookings() {
                 </tr>
               )})}
               
-              {bookings.length === 0 && (
+              {/* 🟢 แจ้งเตือนเมื่อค้นหาไม่เจอข้อมูล */}
+              {filteredBookings.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-text-muted-light">
-                    ไม่พบข้อมูลการจองในระบบ
+                  <td colSpan={7} className="p-8 text-center text-text-muted-light dark:text-text-muted-dark">
+                    {searchTerm ? `ไม่พบข้อมูลที่ตรงกับ "${searchTerm}"` : "ไม่พบข้อมูลการจองในระบบ"}
                   </td>
                 </tr>
               )}
@@ -299,11 +310,10 @@ export default function AdminBookings() {
         </div>
       </div>
 
-      {/* --- Popup Modal สำหรับ Edit (Admin) --- */}
       {isEditModalOpen && editingBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          {/* ... Modal Code (เหมือนเดิม) ... */}
           <div className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            {/* Header */}
             <div className="flex justify-between items-center p-6 pb-4">
               <h2 className="text-xl font-bold">Edit Booking (Admin)</h2>
               <button 
@@ -316,10 +326,8 @@ export default function AdminBookings() {
             
             <div className="w-full h-[1px] bg-gray-100 dark:bg-border-dark mb-4"></div>
 
-            {/* ฟอร์มแก้ไข */}
             <div className="px-6 pb-6 space-y-5">
               
-              {/* 1. Location (Disabled for safety, shows correct name) */}
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Location</label>
                 <div className="relative">
@@ -334,13 +342,12 @@ export default function AdminBookings() {
                 </div>
               </div>
 
-              {/* 2. Space Type & Status */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Space Type</label>
                   <input 
                     type="text" 
-                    value={editingBooking.type}
+                    value={editingBooking.desk ? `${editingBooking.type} (${editingBooking.desk})` : editingBooking.type}
                     className="w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-border-dark rounded-lg text-sm text-gray-500 cursor-not-allowed"
                     disabled
                   />
@@ -363,7 +370,6 @@ export default function AdminBookings() {
                 </div>
               </div>
               
-              {/* 3. Date */}
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Date</label>
                 <div className="relative">
@@ -372,12 +378,11 @@ export default function AdminBookings() {
                     type="date" 
                     value={editingBooking.date}
                     onChange={(e) => setEditingBooking({...editingBooking, date: e.target.value})}
-                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
+                    className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-background-dark border border-gray-300 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
                   />
                 </div>
               </div>
 
-              {/* 4. Time (Start & End) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Start Time</label>
@@ -387,7 +392,7 @@ export default function AdminBookings() {
                       type="time" 
                       value={editingBooking.startTime}
                       onChange={(e) => setEditingBooking({...editingBooking, startTime: e.target.value})}
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-background-dark border border-gray-300 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -399,7 +404,7 @@ export default function AdminBookings() {
                       type="time" 
                       value={editingBooking.endTime}
                       onChange={(e) => setEditingBooking({...editingBooking, endTime: e.target.value})}
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-background-dark border border-gray-200 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-background-dark border border-gray-300 dark:border-border-dark rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -409,7 +414,6 @@ export default function AdminBookings() {
 
             <div className="w-full h-[1px] bg-gray-100 dark:bg-border-dark"></div>
 
-            {/* Footer Buttons */}
             <div className="p-6 flex justify-end gap-3">
               <button 
                 onClick={() => setIsEditModalOpen(false)}

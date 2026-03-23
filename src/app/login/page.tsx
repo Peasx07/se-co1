@@ -1,21 +1,31 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // 🟢 1. อย่าลืม import useEffect
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import axios from 'axios'; // ✅ นำเข้า axios
+import axios from 'axios';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 
 export default function Login() {
   const navigate = useRouter();
   
-  // ✅ เพิ่ม State สำหรับจัดการ Error และสถานะการโหลด
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // 🟢 2. เพิ่ม useEffect เพื่อ "ล้างไพ่" ทุกครั้งที่เปิดหน้า Login
+  useEffect(() => {
+    // ลบข้อมูลใน LocalStorage ทิ้งให้หมด
+    localStorage.removeItem('token');
+    localStorage.removeItem('userRole');
+    
+    // ยิง API ไปบอก Backend ว่าขอลบ Cookie อันเก่าทิ้งด้วย (ดัก Error ไว้เผื่อยังไม่ได้ล็อกอิน)
+    axios.get('http://localhost:5000/api/v1/auth/logout', { withCredentials: true })
+      .catch(() => {});
+  }, []);
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(''); // เคลียร์ error เก่าก่อน
+    setError(''); 
     setIsLoading(true);
     
     const formData = new FormData(e.currentTarget);
@@ -23,50 +33,48 @@ export default function Login() {
     const password = formData.get('password')?.toString() || '';
 
     try {
-      // 1. ยิง API ไปที่ระบบ Login ของ Backend
       const loginRes = await axios.post('http://localhost:5000/api/v1/auth/login', {
         email,
         password
       }, {
-        withCredentials: true // สำคัญ: เพื่อให้รับ cookie/token ข้ามโดเมนได้
+        withCredentials: true 
       });
 
-      // 2. เก็บ Token ที่ได้จาก Backend ลง LocalStorage
       const token = loginRes.data.token;
       if (typeof window !== 'undefined') {
         localStorage.setItem('token', token);
       }
 
-      // 3. ยิง API ไปดึงข้อมูล Profile ของตัวเอง เพื่อดูว่าเป็น Admin หรือ User
       const meRes = await axios.get('http://localhost:5000/api/v1/auth/me', {
         headers: {
-          Authorization: `Bearer ${token}` // แนบ Token ไปด้วย
+          Authorization: `Bearer ${token}` 
         },
         withCredentials: true
       });
 
-      // ดึง role จาก API
       const userRole = meRes.data.data.role; 
       
       if (typeof window !== 'undefined') {
         localStorage.setItem('userRole', userRole);
       }
       
-      // 4. เปลี่ยนหน้าตาม Role
+      // 🟢 3. แก้ไขการเปลี่ยนหน้าตรงนี้ เพื่อป้องกัน Cache ของ Next.js
       if (userRole === 'admin') {
-        navigate.push('/admin');
+        // ใช้ window.location.href เพื่อให้หน้าเว็บโหลดใหม่ทั้งหมด (ล้าง State เก่า)
+        window.location.href = '/admin'; 
       } else {
-        navigate.push('/dashboard');
+        window.location.href = '/dashboard';
       }
 
     } catch (err: any) {
-      // ดักจับกรณีอีเมลหรือรหัสผ่านผิด
       console.error('Login error:', err);
       setError(err.response?.data?.msg || err.response?.data?.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // ... (ส่วน return UI ด้านล่างเหมือนเดิมทุกประการครับ) ...
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background-light dark:bg-background-dark">

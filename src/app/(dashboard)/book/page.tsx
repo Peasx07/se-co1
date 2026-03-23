@@ -9,7 +9,6 @@ function BookContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // 🔴 ดึงข้อมูลจาก URL และป้องกันค่า "undefined" จาก Backend
   const spaceId = searchParams.get('id');
   const spaceName = searchParams.get('name') || 'Select a Workspace';
   
@@ -23,7 +22,6 @@ function BookContent() {
 
   const [selectedDesk, setSelectedDesk] = useState<string | null>(null);
   
-  // ✅ จัดการวันที่ และ เวลา (เพิ่มช่องเวลากลับมาแล้ว)
   const today = new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(today);
   const [startTime, setStartTime] = useState('09:00');
@@ -45,9 +43,12 @@ function BookContent() {
     try {
       const token = localStorage.getItem('token');
       
-      // ✅ ยิง API สร้างการจอง (Reservation) ส่งแค่วันที่ไป หรือจะส่งเวลาไปด้วยก็ได้ถ้า Backend รองรับ
+      // 🟢 อัปเดตข้อมูลที่ส่งไปให้ Backend ใส่เวลาและโต๊ะเข้าไปด้วย
       const res = await axios.post(`http://localhost:5000/api/v1/coworkings/${spaceId}/reservations`, {
-        date: date
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+        desk: selectedDesk
       }, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true
@@ -95,7 +96,6 @@ function BookContent() {
 
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Floor Plan Section */}
           <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-6 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold">Select a Desk</h2>
@@ -135,7 +135,6 @@ function BookContent() {
           </div>
         </div>
 
-        {/* Booking Summary Section */}
         <div className="space-y-6">
           <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-6 shadow-sm sticky top-24">
             <h2 className="text-xl font-bold mb-6">Booking Details</h2>
@@ -171,7 +170,6 @@ function BookContent() {
                     </div>
                   </div>
                   
-                  {/* ✅ ส่วนเลือกเวลา กลับมาแล้ว! */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Start Time</label>
