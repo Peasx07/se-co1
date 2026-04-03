@@ -75,13 +75,11 @@ export default function AdminSpaces() {
           <h1 className="text-2xl font-bold">Spaces Management</h1>
           <p className="text-text-muted-light dark:text-text-muted-dark">Manage your workspace inventory and availability.</p>
         </div>
-        <Link
-          href="/admin/spaces/new"
-          className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg font-medium transition-colors"
-        >
+        {/* ปุ่มนี้เดี๋ยวเราค่อยเชื่อมไปหน้าฟอร์มสร้างสถานที่ (Create Coworking) */}
+        <button className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg font-medium transition-colors">
           <Plus className="w-4 h-4" />
           Add Space
-        </Link>
+        </button>
       </div>
 
       {error && (
