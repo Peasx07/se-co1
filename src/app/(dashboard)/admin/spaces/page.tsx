@@ -4,11 +4,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Building, Plus, Trash2, Edit, X, Clock, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
+// เพิ่มฟิลด์ที่ตกหล่นใน Interface เพื่อให้แก้ไขฟอร์มได้ครบถ้วน
 interface Coworking {
   _id: string;
   name: string;
   address: string;
+  telephone?: string;
   price_per_hour: number;
+  openTime?: string;
+  closeTime?: string;
   status: string;
   type: string;
 }
@@ -17,11 +21,19 @@ export default function AdminSpaces() {
   const [spaces, setSpaces] = useState<Coworking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  // States สำหรับ Create
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+
+  // States สำหรับ Edit
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editingSpace, setEditingSpace] = useState<Coworking | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-august-pen-gay.onrender.com/api/v1';
 
@@ -44,21 +56,34 @@ export default function AdminSpaces() {
     }
   };
 
+  // จัดการการปิด Modal เพิ่มข้อมูล
   const closeAddModal = useCallback(() => {
     setAddModalOpen(false);
     setCreateError('');
     setCreating(false);
   }, []);
 
+  // จัดการการปิด Modal แก้ไขข้อมูล
+  const closeEditModal = useCallback(() => {
+    setEditModalOpen(false);
+    setEditError('');
+    setEditing(false);
+    setEditingSpace(null);
+  }, []);
+
+  // รองรับการกดปุ่ม ESC เพื่อปิด Modal
   useEffect(() => {
-    if (!addModalOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeAddModal();
+      if (e.key === 'Escape') {
+        if (addModalOpen) closeAddModal();
+        if (editModalOpen) closeEditModal();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addModalOpen, closeAddModal]);
+  }, [addModalOpen, editModalOpen, closeAddModal, closeEditModal]);
 
+  // ฟังก์ชันลบข้อมูล
   const handleDelete = async (id: string) => {
     if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสถานที่นี้? ข้อมูลการจองที่เกี่ยวข้องจะถูกลบไปด้วย')) return;
 
@@ -76,6 +101,14 @@ export default function AdminSpaces() {
     }
   };
 
+  // ฟังก์ชันเปิด Modal แก้ไขและดึงข้อมูลเดิมมาใส่
+  const openEditModal = (space: Coworking) => {
+    setEditingSpace(space);
+    setEditError('');
+    setEditModalOpen(true);
+  };
+
+  // ฟังก์ชันสร้างข้อมูลใหม่
   const handleCreateSpace = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setCreateError('');
@@ -99,28 +132,13 @@ export default function AdminSpaces() {
     const status = (fd.get('status') as string) || 'available';
 
     const price_per_hour = Number(priceRaw);
-    if (!name || !address || !telephone) {
-      setCreateError('กรุณากรอกข้อมูลที่จำเป็นให้ครบ');
-      return;
-    }
-    if (Number.isNaN(price_per_hour) || price_per_hour < 0) {
-      setCreateError('กรุณากรอกราคาต่อชั่วโมงให้ถูกต้อง');
-      return;
-    }
-    if (!open_time || !close_time) {
-      setCreateError('กรุณาเลือกเวลาเปิด–ปิด');
+    if (!name || !address || !telephone || Number.isNaN(price_per_hour) || price_per_hour < 0 || !open_time || !close_time) {
+      setCreateError('กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง');
       return;
     }
 
-    const payload: Record<string, unknown> = {
-      name,
-      address,
-      telephone,
-      price_per_hour,
-      openTime: open_time,
-      closeTime: close_time,
-      type,
-      status,
+    const payload = {
+      name, address, telephone, price_per_hour, openTime: open_time, closeTime: close_time, type, status,
     };
 
     setCreating(true);
@@ -131,12 +149,65 @@ export default function AdminSpaces() {
       });
       form.reset();
       closeAddModal();
-      fetchSpaces();
+      fetchSpaces(); // โหลดข้อมูลใหม่หลังจากสร้างเสร็จ
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { message?: string; msg?: string } } };
       setCreateError(ax.response?.data?.message || ax.response?.data?.msg || 'ไม่สามารถเพิ่มสถานที่ได้');
     } finally {
       setCreating(false);
+    }
+  };
+
+  // ฟังก์ชันอัปเดตข้อมูล (ส่ง PUT/PATCH ไปที่ Backend)
+  const handleUpdateSpace = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setEditError('');
+
+    if (!editingSpace) return;
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      setEditError('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+      return;
+    }
+
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const name = (fd.get('name') as string)?.trim();
+    const address = (fd.get('address') as string)?.trim();
+    const telephone = (fd.get('telephone') as string)?.trim();
+    const priceRaw = fd.get('price_per_hour') as string;
+    const open_time = (fd.get('open_time') as string) || '';
+    const close_time = (fd.get('close_time') as string) || '';
+    const type = (fd.get('type') as string) || 'desk';
+    const status = (fd.get('status') as string) || 'available';
+
+    const price_per_hour = Number(priceRaw);
+    
+    // ตรวจสอบความถูกต้องของข้อมูลเบื้องต้น
+    if (!name || !address || !telephone || Number.isNaN(price_per_hour) || price_per_hour < 0 || !open_time || !close_time) {
+      setEditError('กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง');
+      return;
+    }
+
+    const payload = {
+      name, address, telephone, price_per_hour, openTime: open_time, closeTime: close_time, type, status,
+    };
+
+    setEditing(true);
+    try {
+      // ส่งคำสั่งอัปเดตไปที่ Backend (ใช้ PUT method)
+      await axios.put(`${API_URL}/coworkings/${editingSpace._id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
+      });
+      closeEditModal();
+      fetchSpaces(); // รีเฟรชข้อมูลในตารางใหม่
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { message?: string; msg?: string } } };
+      setEditError(ax.response?.data?.message || ax.response?.data?.msg || 'ไม่สามารถอัปเดตสถานที่ได้');
+    } finally {
+      setEditing(false);
     }
   };
 
@@ -231,7 +302,11 @@ export default function AdminSpaces() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button className="p-2 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark">
+                        {/* ผูกฟังก์ชัน openEditModal เข้ากับปุ่ม Edit */}
+                        <button 
+                          onClick={() => openEditModal(space)}
+                          className="p-2 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark"
+                        >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
@@ -261,138 +336,58 @@ export default function AdminSpaces() {
         )}        
       </div>
 
+      {/* ================= MODAL เพิ่มข้อมูล (CREATE) ================= */}
       {addModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          role="presentation"
-          onClick={closeAddModal}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="add-space-title"
-            className="w-full max-w-xl rounded-2xl bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200"
-            onClick={(ev) => ev.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" role="presentation" onClick={closeAddModal}>
+          <div role="dialog" className="w-full max-w-xl rounded-2xl bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200" onClick={(ev) => ev.stopPropagation()}>
             <div className="flex justify-between items-center px-6 pt-6 pb-2">
-              <h2 id="add-space-title" className="text-lg font-bold text-white">
-                Add New Space
-              </h2>
-              <button
-                type="button"
-                onClick={closeAddModal}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                aria-label="Close"
-              >
+              <h2 className="text-lg font-bold text-white">Add New Space</h2>
+              <button type="button" onClick={closeAddModal} className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateSpace} className="px-6 pb-6 pt-2 space-y-4">
-              {createError && (
-                <div className="text-sm text-red-400 bg-red-950/50 border border-red-800/60 rounded-lg px-3 py-2">{createError}</div>
-              )}
-
+              {createError && <div className="text-sm text-red-400 bg-red-950/50 border border-red-800/60 rounded-lg px-3 py-2">{createError}</div>}
+              {/* === ซ่อนฟอร์ม Create ไว้ (เหมือนของเดิม) === */}
               <div>
-                <label htmlFor="add-name" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                  Name <span className="text-primary">*</span>
-                </label>
-                <input
-                  id="add-name"
-                  name="name"
-                  required
-                  placeholder="e.g. The Hub Bangkok"
-                  className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
-                />
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Name <span className="text-primary">*</span></label>
+                <input name="name" required placeholder="e.g. The Hub Bangkok" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
               </div>
-
               <div>
-                <label htmlFor="add-address" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                  Address <span className="text-primary">*</span>
-                </label>
-                <input
-                  id="add-address"
-                  name="address"
-                  required
-                  placeholder="e.g. 123 Sukhumvit Rd, Bangkok"
-                  className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
-                />
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Address <span className="text-primary">*</span></label>
+                <input name="address" required placeholder="e.g. 123 Sukhumvit Rd, Bangkok" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="add-phone" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                    Telephone <span className="text-primary">*</span>
-                  </label>
-                  <input
-                    id="add-phone"
-                    name="telephone"
-                    required
-                    placeholder="02-xxx-xxxx"
-                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
-                  />
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Telephone <span className="text-primary">*</span></label>
+                  <input name="telephone" required placeholder="02-xxx-xxxx" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
                 </div>
                 <div>
-                  <label htmlFor="add-price" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                    Price / Hour (฿) <span className="text-primary">*</span>
-                  </label>
-                  <input
-                    id="add-price"
-                    name="price_per_hour"
-                    type="number"
-                    min={0}
-                    step={1}
-                    required
-                    placeholder="150"
-                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
-                  />
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Price / Hour (฿) <span className="text-primary">*</span></label>
+                  <input name="price_per_hour" type="number" min={0} step={1} required placeholder="150" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="add-open" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                    Open Time <span className="text-primary">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Open Time <span className="text-primary">*</span></label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
-                    <input
-                      id="add-open"
-                      name="open_time"
-                      type="time"
-                      required
-                      className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 scheme-dark"
-                    />
+                    <input name="open_time" type="time" required className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 scheme-dark" />
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="add-close" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                    Close Time <span className="text-primary">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Close Time <span className="text-primary">*</span></label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
-                    <input
-                      id="add-close"
-                      name="close_time"
-                      type="time"
-                      required
-                      className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 scheme-dark"
-                    />
+                    <input name="close_time" type="time" required className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 scheme-dark" />
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="add-type" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                    Type <span className="text-primary">*</span>
-                  </label>
-                  <select
-                    id="add-type"
-                    name="type"
-                    defaultValue="desk"
-                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 appearance-none cursor-pointer"
-                  >
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Type <span className="text-primary">*</span></label>
+                  <select name="type" defaultValue="desk" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 appearance-none cursor-pointer">
                     <option value="desk">Desk</option>
                     <option value="room">Room</option>
                     <option value="meeting">Meeting room</option>
@@ -400,36 +395,95 @@ export default function AdminSpaces() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="add-status" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                    Status
-                  </label>
-                  <select
-                    id="add-status"
-                    name="status"
-                    defaultValue="available"
-                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 appearance-none cursor-pointer"
-                  >
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Status</label>
+                  <select name="status" defaultValue="available" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 appearance-none cursor-pointer">
                     <option value="available">Available</option>
                     <option value="unavailable">Unavailable</option>
                     <option value="maintenance">Maintenance</option>
                   </select>
                 </div>
               </div>
-
               <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={closeAddModal}
-                  className="flex-1 py-3 rounded-xl font-semibold border-2 border-zinc-500 text-white bg-transparent hover:bg-zinc-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-hover text-white transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
+                <button type="button" onClick={closeAddModal} className="flex-1 py-3 rounded-xl font-semibold border-2 border-zinc-500 text-white bg-transparent hover:bg-zinc-800 transition-colors">Cancel</button>
+                <button type="submit" disabled={creating} className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-hover text-white transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
                   {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Space'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL แก้ไขข้อมูล (EDIT) ================= */}
+      {editModalOpen && editingSpace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" role="presentation" onClick={closeEditModal}>
+          <div role="dialog" className="w-full max-w-xl rounded-2xl bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200" onClick={(ev) => ev.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 pt-6 pb-2">
+              <h2 className="text-lg font-bold text-white">Edit Space</h2>
+              <button type="button" onClick={closeEditModal} className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSpace} className="px-6 pb-6 pt-2 space-y-4">
+              {editError && <div className="text-sm text-red-400 bg-red-950/50 border border-red-800/60 rounded-lg px-3 py-2">{editError}</div>}
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Name <span className="text-primary">*</span></label>
+                <input name="name" defaultValue={editingSpace.name} required className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Address <span className="text-primary">*</span></label>
+                <input name="address" defaultValue={editingSpace.address} required className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Telephone <span className="text-primary">*</span></label>
+                  <input name="telephone" defaultValue={editingSpace.telephone} required className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Price / Hour (฿) <span className="text-primary">*</span></label>
+                  <input name="price_per_hour" type="number" min={0} step={1} defaultValue={editingSpace.price_per_hour} required className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Open Time <span className="text-primary">*</span></label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                    <input name="open_time" type="time" defaultValue={editingSpace.openTime} required className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 scheme-dark" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Close Time <span className="text-primary">*</span></label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                    <input name="close_time" type="time" defaultValue={editingSpace.closeTime} required className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 scheme-dark" />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Type <span className="text-primary">*</span></label>
+                  <select name="type" defaultValue={editingSpace.type} className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 appearance-none cursor-pointer">
+                    <option value="desk">Desk</option>
+                    <option value="room">Room</option>
+                    <option value="meeting">Meeting room</option>
+                    <option value="private">Private office</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">Status</label>
+                  <select name="status" defaultValue={editingSpace.status} className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 appearance-none cursor-pointer">
+                    <option value="available">Available</option>
+                    <option value="unavailable">Unavailable</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+                <button type="button" onClick={closeEditModal} className="flex-1 py-3 rounded-xl font-semibold border-2 border-zinc-500 text-white bg-transparent hover:bg-zinc-800 transition-colors">Cancel</button>
+                <button type="submit" disabled={editing} className="flex-1 py-3 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                  {editing ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Update Space'}
                 </button>
               </div>
             </form>
