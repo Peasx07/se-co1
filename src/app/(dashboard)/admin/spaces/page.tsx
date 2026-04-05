@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Building, Plus, Trash2, Edit, X, Clock, Loader2 } from 'lucide-react';
+import { Building, Plus, Trash2, Edit, X, Clock, Loader2, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import Alert from '@/src/components/Alert';
 
@@ -36,11 +36,16 @@ export default function AdminSpaces() {
   const [editing, setEditing] = useState(false);
   const [editingSpace, setEditingSpace] = useState<Coworking | null>(null);
 
+  // States สำหรับ Delete Confirmation (เพิ่มใหม่)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [spaceToDelete, setSpaceToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   //สำหรับเรียกใช้ Alert งับ
   const [alert, setAlert] = useState<{
-  message: string;
-  type: 'success' | 'error' | 'warning';
-} | null>(null);
+    message: string;
+    type: 'success' | 'error' | 'warning';
+  } | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-august-pen-gay.onrender.com/api/v1';
 
@@ -78,29 +83,50 @@ export default function AdminSpaces() {
     setEditingSpace(null);
   }, []);
 
+  // ฟังก์ชันจัดการ Modal ยืนยันการลบ (เพิ่มใหม่)
+  const openDeleteModal = (id: string) => {
+    setSpaceToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModalOpen(false);
+    setSpaceToDelete(null);
+    setIsDeleting(false);
+  }, []);
+
   // รองรับการกดปุ่ม ESC เพื่อปิด Modal
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (addModalOpen) closeAddModal();
         if (editModalOpen) closeEditModal();
+        if (deleteModalOpen) closeDeleteModal();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addModalOpen, editModalOpen, closeAddModal, closeEditModal]);
+  }, [addModalOpen, editModalOpen, deleteModalOpen, closeAddModal, closeEditModal, closeDeleteModal]);
 
-  // ฟังก์ชันลบข้อมูล
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสถานที่นี้? ข้อมูลการจองที่เกี่ยวข้องจะถูกลบไปด้วย')) return;
+  // ฟังก์ชันลบข้อมูล (แก้ไขให้ทำงานร่วมกับ Modal และ Alert ของคุณ)
+  const confirmDelete = async () => {
+    if (!spaceToDelete) return;
 
+    setIsDeleting(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/coworkings/${id}`, {
+      await axios.delete(`${API_URL}/coworkings/${spaceToDelete}`, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
       fetchSpaces();
+      closeDeleteModal();
+      
+      // เรียกใช้ Alert เมื่อลบสำเร็จ
+      setAlert({
+        message: 'Deleted successfully 🎉',
+        type: 'success'
+      });
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { message?: string } } };
       console.error('Delete error:', err);
@@ -108,6 +134,9 @@ export default function AdminSpaces() {
         message: 'ไม่สามารถลบได้: ' + (ax.response?.data?.message || 'เกิดข้อผิดพลาด'),
         type: 'error'
       });
+      closeDeleteModal();
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -234,7 +263,6 @@ export default function AdminSpaces() {
 
   if (loading) {
     return (
-      
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
@@ -336,8 +364,9 @@ export default function AdminSpaces() {
                         >
                           <Edit className="w-4 h-4" />
                         </button>
+                        {/* ผูกฟังก์ชันเปิด Delete Modal ตรงนี้ */}
                         <button
-                          onClick={() => handleDelete(space._id)}
+                          onClick={() => openDeleteModal(space._id)}
                           className="p-2 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -517,6 +546,43 @@ export default function AdminSpaces() {
           </div>
         </div>
       )}
+
+      {/* ================= MODAL ยืนยันการลบ (DELETE CONFIRMATION) ================= */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" role="presentation" onClick={closeDeleteModal}>
+          <div role="dialog" className="w-full max-w-md rounded-2xl bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200" onClick={(ev) => ev.stopPropagation()}>
+            <div className="flex flex-col items-center text-center p-6 pt-8">
+              <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">Confirm Deletion</h2>
+              <p className="text-zinc-400 text-sm mb-6">
+                Are you sure you want to delete this space?<br/>
+                All related bookings will also be deleted<br/>and this action cannot be undone.
+              </p>
+              
+              <div className="flex flex-col-reverse sm:flex-row gap-3 w-full">
+                <button 
+                  type="button" 
+                  onClick={closeDeleteModal} 
+                  className="flex-1 py-3 rounded-xl font-semibold border-2 border-zinc-600 text-zinc-300 bg-transparent hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={confirmDelete} 
+                  disabled={isDeleting} 
+                  className="flex-1 py-3 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
