@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import axios from 'axios'; 
+import axios from 'axios';
 import { User, Mail, Lock, ArrowRight, Phone } from 'lucide-react';
 
 export default function SignUp() {
@@ -52,7 +52,7 @@ export default function SignUp() {
     try {
       const res = await axios.post(`${API_URL}/auth/register`, {
         ...pendingFormData,
-        role: 'user' 
+        role: 'user'
       }, {
         withCredentials: true
       });
@@ -75,13 +75,13 @@ export default function SignUp() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex relative">
-      
+
       {/* --- 1. Privacy Modal --- */}
       {showPrivacyModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm">
           {/* Container หลัก: เพิ่มขอบสีส้มและมุมโค้งมน */}
-          <div className="bg-white border-[2px] md:border-[16px] border-[#f97316] rounded-[32px] shadow-2xl max-w-2xl w-full flex flex-col transform transition-all duration-300 scale-100 max-h-[90vh]">
-            
+          <div className="bg-white border-[12px] md:border-[3px] border-[#f97316] rounded-[32px] shadow-2xl max-w-2xl w-full flex flex-col transform transition-all duration-300 scale-100 max-h-[90vh]">
+
             {/* Modal Header: พื้นหลังสีขาว ตัวอักษรสีดำ ตัวหนา */}
             <div className="bg-white p-6 text-center border-b border-gray-100 rounded-t-[20px]">
               <h2 className="text-2xl md:text-3xl font-bold text-black tracking-tight">Privacy Policy</h2>
@@ -90,33 +90,32 @@ export default function SignUp() {
             {/* Modal Content - Scrollable */}
             <div className="p-6 md:p-8 space-y-6 text-gray-700 leading-relaxed overflow-y-auto">
               <p>
-                Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Fusce
-                dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
-                fermentum massa justo sit amet risus. Donec id elit non mi porta gravida at eget
-                metus. Sed posuere consectetur est at lobortis. Donec id elit non mi porta gravida
-                at eget metus.
+                Welcome to our platform. Your privacy is critically important to us. This Privacy Policy
+                explains how we collect, use, disclose, and safeguard your information when you create an
+                account or visit our website. When you register, we may collect personal identifiable
+                information such as your full name, email address, and telephone number to establish and
+                manage your account.
               </p>
               <p>
-                Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
-                fermentum massa justo sit amet risus. Donec sed odio dui. Integer posuere erat a
-                ante venenatis dapibus posuere velit aliquet. Cum sociis natoque penatibus et
-                magnis dis parturient montes, nascetur ridiculus mus. Praesent commodo cursus
-                magna, vel scelerisque nisl consectetur et. Donec id elit non mi porta gravida at
-                eget metus.
+                We use the information we collect in various ways, including to provide, operate, and
+                maintain our services. Furthermore, your data helps us to understand and analyze how you
+                use our platform, allowing us to improve, personalize, and expand our offerings. We may
+                also use your information to communicate with you for customer service, updates, and
+                security alerts.
               </p>
               <p>
-                Donec ullamcorper nulla non metus auctor fringilla. Integer posuere erat a ante
-                venenatis dapibus posuere velit aliquet. Praesent commodo cursus magna, vel
-                scelerisque nisl consectetur et. Donec id elit non mi porta gravida at eget metus.
-                Cras justo odio, dapibus ac facilisis in, egestas eget quam. Vivamus sagittis lacus
-                vel augue laoreet rutrum faucibus dolor auctor. Etiam porta sem malesuada
-                magna mollis euismod.
+                We are committed to protecting your personal data. We implement a variety of industry-standard
+                security measures to maintain the safety of your personal information. However, please be
+                aware that no method of transmission over the internet or method of electronic storage is
+                100% secure. While we strive to use commercially acceptable means to protect your personal
+                data, we cannot guarantee its absolute security.
               </p>
               <p>
-                Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
-                fermentum massa justo sit amet risus. Duis mollis, est non commodo luctus, nisi
-                erat porttitor ligula, eget lacinia odio sem nec elit. Nullam quis risus eget urna
-                mollis ornare vel eu leo.
+                We do not sell, trade, or otherwise transfer your personally identifiable information to
+                outside parties without your consent, except to trusted third parties who assist us in
+                operating our website or conducting our business, so long as those parties agree to keep
+                this information confidential. By clicking "I Agree", you consent to our privacy practices
+                as described in this document.
               </p>
             </div>
 
@@ -142,9 +141,9 @@ export default function SignUp() {
       {/* --- Original Signup Page Layout --- */}
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900">
-        <img 
-          src="https://picsum.photos/seed/signup/1000/1200" 
-          alt="Workspace" 
+        <img
+          src="https://picsum.photos/seed/signup/1000/1200"
+          alt="Workspace"
           className="absolute inset-0 w-full h-full object-cover opacity-60"
           referrerPolicy="no-referrer"
         />
@@ -166,7 +165,7 @@ export default function SignUp() {
               Start your 7-day free trial today. No credit card required.
             </p>
           </div>
-          
+
           {error && (
             <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm text-center">
               {error}
@@ -207,7 +206,7 @@ export default function SignUp() {
                   <input id="email" name="email" type="email" required placeholder="jane@example.com" className="appearance-none relative block w-full px-3 py-3 pl-10 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f97316] focus:border-[#f97316] sm:text-sm transition-colors text-gray-900 dark:text-white" />
                 </div>
               </div>
-              
+
               {/* --- Password --- */}
               <div>
                 <label htmlFor="password" className="block text-sm font-medium mb-1">Password</label>
@@ -224,9 +223,8 @@ export default function SignUp() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white transition-colors ${
-                  isLoading ? 'bg-[#f97316]/70 cursor-not-allowed' : 'bg-[#f97316] hover:bg-[#ea580c]'
-                }`}
+                className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white transition-colors ${isLoading ? 'bg-[#f97316]/70 cursor-not-allowed' : 'bg-[#f97316] hover:bg-[#ea580c]'
+                  }`}
               >
                 {isLoading ? 'Creating Account...' : 'Create Account'}
                 {!isLoading && <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />}
