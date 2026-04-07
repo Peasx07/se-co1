@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios'; 
-
 import { User, Mail, Lock, ArrowRight, Phone } from 'lucide-react';
 
 export default function SignUp() {
@@ -12,39 +11,47 @@ export default function SignUp() {
 
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState(null);
 
-  // 🌟 1. สร้างตัวแปร URL ดึงจาก Environment หรือ Render URL ของเรา
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-august-pen-gay.onrender.com/api/v1';
 
-  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
+  // --- Initial Form Submit ---
+  const handleSignUpClick = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const name = formData.get('name')?.toString() || '';
-    const telephone = formData.get('telephone')?.toString() || '';
-    const email = formData.get('email')?.toString() || '';
-    const password = formData.get('password')?.toString() || '';
+    const data = {
+      name: formData.get('name')?.toString() || '',
+      telephone: formData.get('telephone')?.toString() || '',
+      email: formData.get('email')?.toString() || '',
+      password: formData.get('password')?.toString() || '',
+    };
 
-    if (!/^[0-9]{9,10}$/.test(telephone)) {
+    // basic validation
+    if (!/^[0-9]{9,10}$/.test(data.telephone)) {
       setError('เบอร์โทรศัพท์ต้องเป็นตัวเลข 9-10 หลักเท่านั้น');
-      setIsLoading(false);
       return;
     }
-    if (password.length < 6) {
+    if (data.password.length < 6) {
       setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
-      setIsLoading(false);
       return;
     }
+
+    // Save data and show modal
+    setPendingFormData(data);
+    setShowPrivacyModal(true);
+  };
+
+  // --- Final Registration API Call ---
+  const completeRegistration = async () => {
+    setShowPrivacyModal(false);
+    setIsLoading(true);
 
     try {
-      // 🌟 2. เปลี่ยน localhost เป็น API_URL
       const res = await axios.post(`${API_URL}/auth/register`, {
-        name,
-        email,
-        password,
-        telephone,
+        ...pendingFormData,
         role: 'user' 
       }, {
         withCredentials: true
@@ -67,7 +74,71 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex">
+    <div className="min-h-[calc(100vh-4rem)] flex relative">
+      
+      {/* --- 1. Privacy Modal --- */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-sm shadow-xl max-w-2xl w-full overflow-hidden flex flex-col transform transition-all duration-300 scale-100">
+            
+            {/* Modal Header */}
+            <div className="bg-[#b14a4a] text-white p-6 text-center">
+              <h2 className="text-2xl font-serif tracking-tight">Privacy Policy</h2>
+            </div>
+
+            {/* Modal Content - Scrollable if needed */}
+            <div className="p-8 space-y-6 text-gray-800 leading-relaxed max-h-[70vh] overflow-y-auto">
+              <p>
+                Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Fusce
+                dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
+                fermentum massa justo sit amet risus. Donec id elit non mi porta gravida at eget
+                metus. Sed posuere consectetur est at lobortis. Donec id elit non mi porta gravida
+                at eget metus.
+              </p>
+              <p>
+                Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
+                fermentum massa justo sit amet risus. Donec sed odio dui. Integer posuere erat a
+                ante venenatis dapibus posuere velit aliquet. Cum sociis natoque penatibus et
+                magnis dis parturient montes, nascetur ridiculus mus. Praesent commodo cursus
+                magna, vel scelerisque nisl consectetur et. Donec id elit non mi porta gravida at
+                eget metus.
+              </p>
+              <p>
+                Donec ullamcorper nulla non metus auctor fringilla. Integer posuere erat a ante
+                venenatis dapibus posuere velit aliquet. Praesent commodo cursus magna, vel
+                scelerisque nisl consectetur et. Donec id elit non mi porta gravida at eget metus.
+                Cras justo odio, dapibus ac facilisis in, egestas eget quam. Vivamus sagittis lacus
+                vel augue laoreet rutrum faucibus dolor auctor. Etiam porta sem malesuada
+                magna mollis euismod.
+              </p>
+              <p>
+                Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
+                fermentum massa justo sit amet risus. Duis mollis, est non commodo luctus, nisi
+                erat porttitor ligula, eget lacinia odio sem nec elit. Nullam quis risus eget urna
+                mollis ornare vel eu leo.
+              </p>
+            </div>
+
+            {/* Modal Footer (Buttons) */}
+            <div className="bg-gray-50 px-8 py-6 flex justify-end gap-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowPrivacyModal(false)} // Just closes, stays on signup page
+                className="bg-[#1a1a1a] text-white px-8 py-3 text-sm font-semibold tracking-wider hover:bg-black transition rounded-sm uppercase"
+              >
+                I Disagree
+              </button>
+              <button
+                onClick={completeRegistration} // Calls API and redirects
+                className="bg-[#1a1a1a] text-white px-8 py-3 text-sm font-semibold tracking-wider hover:bg-black transition rounded-sm uppercase"
+              >
+                I Agree
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Original Signup Page Layout --- */}
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900">
         <img 
@@ -101,9 +172,9 @@ export default function SignUp() {
             </div>
           )}
 
-          <form className="mt-8 space-y-6" onSubmit={handleSignUp}>
+          {/* Form action calls the interceptor function */}
+          <form className="mt-8 space-y-6" onSubmit={handleSignUpClick}>
             <div className="space-y-4">
-              
               {/* --- Full Name --- */}
               <div>
                 <label htmlFor="name" className="block text-sm font-medium mb-1">Full Name</label>
@@ -111,14 +182,7 @@ export default function SignUp() {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-text-muted-light dark:text-text-muted-dark" />
                   </div>
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    required
-                    className="appearance-none relative block w-full px-3 py-3 pl-10 border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-colors text-text-light dark:text-text-dark"
-                    placeholder="Jane Doe"
-                  />
+                  <input id="name" name="name" type="text" required placeholder="Jane Doe" className="..." />
                 </div>
               </div>
 
@@ -129,14 +193,7 @@ export default function SignUp() {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Phone className="h-5 w-5 text-text-muted-light dark:text-text-muted-dark" />
                   </div>
-                  <input
-                    id="telephone"
-                    name="telephone"
-                    type="tel"
-                    required
-                    className="appearance-none relative block w-full px-3 py-3 pl-10 border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-colors text-text-light dark:text-text-dark"
-                    placeholder="0812345678"
-                  />
+                  <input id="telephone" name="telephone" type="tel" required placeholder="0812345678" className="..." />
                 </div>
               </div>
 
@@ -147,15 +204,7 @@ export default function SignUp() {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-text-muted-light dark:text-text-muted-dark" />
                   </div>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    className="appearance-none relative block w-full px-3 py-3 pl-10 border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-colors text-text-light dark:text-text-dark"
-                    placeholder="jane@example.com"
-                  />
+                  <input id="email" name="email" type="email" required placeholder="jane@example.com" className="..." />
                 </div>
               </div>
               
@@ -166,15 +215,7 @@ export default function SignUp() {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Lock className="h-5 w-5 text-text-muted-light dark:text-text-muted-dark" />
                   </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    className="appearance-none relative block w-full px-3 py-3 pl-10 border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-colors text-text-light dark:text-text-dark"
-                    placeholder="••••••••"
-                  />
+                  <input id="password" name="password" type="password" required placeholder="••••••••" className="..." />
                 </div>
               </div>
             </div>
@@ -184,7 +225,7 @@ export default function SignUp() {
                 type="submit"
                 disabled={isLoading}
                 className={`group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white transition-colors ${
-                  isLoading ? 'bg-primary/70 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary'
+                  isLoading ? 'bg-primary/70 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover'
                 }`}
               >
                 {isLoading ? 'Creating Account...' : 'Create Account'}
@@ -192,8 +233,6 @@ export default function SignUp() {
               </button>
             </div>
           </form>
-
-          {/* ... (ส่วนปุ่มอื่นๆ) ... */}
 
           <p className="mt-8 text-center text-sm text-text-muted-light dark:text-text-muted-dark">
             Already have an account?{' '}
