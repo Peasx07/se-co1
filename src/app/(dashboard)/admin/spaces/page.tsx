@@ -430,7 +430,7 @@ export default function AdminSpaces() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1.5">Telephone <span className="text-primary">*</span></label>
-                  <input name="telephone" type="tel" inputMode="numeric" autoComplete="tel" required placeholder="0812345678 หรือ 02-123-4567" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
+                  <input name="telephone" type="tel" inputMode="numeric" autoComplete="tel" required placeholder="0812345678 or 02-123-4567" className="w-full px-3 py-2.5 rounded-xl bg-zinc-800/80 border border-zinc-600 text-white placeholder:text-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60" />
                   <p className="mt-1 text-xs text-zinc-500">number only, starts with 0 and has 9 or 10 digits</p>
                 </div>
                 <div>
