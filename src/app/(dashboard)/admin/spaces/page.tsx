@@ -279,6 +279,30 @@ export default function AdminSpaces() {
     }
   }, [spaces.length, totalPages, currentPage]);
 
+  // เพิ่ม useEffect สำหรับดักจับการกดปุ่มลูกศร ซ้าย-ขวา
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ตรวจสอบว่า User กำลังพิมพ์อยู่ใน Input หรือ Select หรือไม่ 
+      // เพื่อป้องกันไม่ให้เปลี่ยนหน้าขณะกำลังกรอกข้อมูล
+      const isTyping = 
+        document.activeElement instanceof HTMLInputElement || 
+        document.activeElement instanceof HTMLTextAreaElement ||
+        document.activeElement instanceof HTMLSelectElement;
+
+      if (isTyping) return;
+
+      if (e.key === 'ArrowLeft') {
+        setCurrentPage((prev) => Math.max(prev - 1, 1));
+      } else if (e.key === 'ArrowRight') {
+        setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [totalPages]); // ใส่ totalPages เป็น dependency เพื่อให้ได้ค่าที่อัปเดตเสมอ
+
+
   const startIndex = (currentPage - 1) * safeRowsPerPage;
   const endIndex = startIndex + safeRowsPerPage;
   const displayedSpaces = spaces.slice(startIndex, endIndex);
@@ -355,7 +379,71 @@ export default function AdminSpaces() {
       )}
 
       <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto min-h-[300px]">
+        
+        {/* --- ส่วน Pagination UI ด้านล่างตาราง --- */}
+        {spaces.length > 0 && (
+          <div className="p-4 border-b border-border-light dark:border-border-dark flex flex-col sm:flex-row items-center justify-between gap-4 bg-background-light dark:bg-background-dark/50">
+            {/* โซนเลือกจำนวนรายการ */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-muted-light dark:text-text-muted-dark">Rows per page:</span>
+              <select
+                value={isCustomRows ? 'custom' : rowsPerPage}
+                onChange={handleRowsChange}
+                // แก้ไขสีพื้นหลังและสีตัวหนังสือให้แสดงผลชัดเจนทั้งโหมดสว่างและมืด
+                className="bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/60 text-gray-900 dark:text-white cursor-pointer"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value="custom">Custom</option>
+              </select>
+              
+              {/* ช่องกรอกตัวเลข กรณีเลือก Custom */}
+              {isCustomRows && (
+                <input
+                  type="number"
+                  min="1"
+                  value={customRowsValue}
+                  onChange={handleCustomRowsChange}
+                  placeholder="e.g. 15"
+                  // แก้ไขสีพื้นหลังและสีตัวหนังสือ
+                  className="w-20 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/60 text-gray-900 dark:text-white"
+                />
+              )}
+            </div>
+
+            {/* โซนปุ่มเปลี่ยนหน้า */}
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-text-muted-light dark:text-text-muted-dark">
+                {/* แก้ไขสีตัวเลขให้เป็นสีขาวใน Dark mode */}
+                Page <span className="font-medium text-gray-900 dark:text-white">{totalPages === 0 ? 0 : currentPage}</span> of <span className="font-medium text-gray-900 dark:text-white">{totalPages}</span>
+                <span className="hidden sm:inline"> ({spaces.length} items)</span>
+              </span>
+              
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1 || totalPages === 0}
+                  className="p-1.5 rounded-lg border border-transparent hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="p-1.5 rounded-lg border border-transparent hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}    
+
+        <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-background-light dark:bg-background-dark border-b border-border-light dark:border-border-dark">
@@ -428,72 +516,10 @@ export default function AdminSpaces() {
           </table>
         </div>
 
-        {/* --- ส่วน Pagination UI ด้านล่างตาราง --- */}
-        {spaces.length > 0 && (
-          <div className="p-4 border-t border-border-light dark:border-border-dark flex flex-col sm:flex-row items-center justify-between gap-4 bg-background-light dark:bg-background-dark/50">
-            {/* โซนเลือกจำนวนรายการ */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-text-muted-light dark:text-text-muted-dark">Rows per page:</span>
-              <select
-                value={isCustomRows ? 'custom' : rowsPerPage}
-                onChange={handleRowsChange}
-                // แก้ไขสีพื้นหลังและสีตัวหนังสือให้แสดงผลชัดเจนทั้งโหมดสว่างและมืด
-                className="bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/60 text-gray-900 dark:text-white cursor-pointer"
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value="custom">Custom</option>
-              </select>
-              
-              {/* ช่องกรอกตัวเลข กรณีเลือก Custom */}
-              {isCustomRows && (
-                <input
-                  type="number"
-                  min="1"
-                  value={customRowsValue}
-                  onChange={handleCustomRowsChange}
-                  placeholder="e.g. 15"
-                  // แก้ไขสีพื้นหลังและสีตัวหนังสือ
-                  className="w-20 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/60 text-gray-900 dark:text-white"
-                />
-              )}
-            </div>
-
-            {/* โซนปุ่มเปลี่ยนหน้า */}
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-text-muted-light dark:text-text-muted-dark">
-                {/* แก้ไขสีตัวเลขให้เป็นสีขาวใน Dark mode */}
-                Page <span className="font-medium text-gray-900 dark:text-white">{totalPages === 0 ? 0 : currentPage}</span> of <span className="font-medium text-gray-900 dark:text-white">{totalPages}</span>
-                <span className="hidden sm:inline"> ({spaces.length} items)</span>
-              </span>
-              
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1 || totalPages === 0}
-                  className="p-1.5 rounded-lg border border-transparent hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  className="p-1.5 rounded-lg border border-transparent hover:bg-gray-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                  aria-label="Next page"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}     
+ 
       </div>
 
       {/* ================= MODAL เพิ่มข้อมูล (CREATE) ================= */}
-      {/* ... (เนื้อหา Modal ของคุณเหมือนเดิมทั้งหมด ไม่มีการเปลี่ยนแปลงครับ) ... */}
       {addModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" role="presentation" onClick={closeAddModal}>
           <div role="dialog" className="w-full max-w-xl rounded-2xl bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200" onClick={(ev) => ev.stopPropagation()}>
