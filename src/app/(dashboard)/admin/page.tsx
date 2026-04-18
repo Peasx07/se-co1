@@ -36,7 +36,7 @@ export default function Admin() {
   const [filterSpace, setFilterSpace] = useState('All');
   const [sortBy, setSortBy] = useState('date-desc'); 
 
-  const API_URL = 'http://localhost:5000/api/v1';
+  const API_URL = 'https://backend-august-pen-gay.onrender.com/api/v1';
 
   const fetchDashboardData = async () => {
     try {
