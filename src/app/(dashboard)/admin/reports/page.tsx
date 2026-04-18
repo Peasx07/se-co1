@@ -70,6 +70,7 @@ export default function AdminReports() {
                   </div>
                 </div>
                 <div className="text-xl font-bold">$420</div>
+                 {/* test1 */}
               </div>
             </div>
           </div>
