@@ -3,9 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Building, Plus, Trash2, Edit, X, Clock, 
-  Loader2, AlertTriangle, ChevronLeft, ChevronRight,
-  Search, FilterX, ArrowUp, ArrowDown, ArrowUpDown,
-  ArchiveRestore, Trash // 🟢 เพิ่ม Icon สำหรับ Recycle Bin และ Restore
+  Loader2, AlertTriangle, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import axios from 'axios';
 import Alert from '@/components/Alert';
@@ -31,24 +29,20 @@ interface SortConfig {
   direction: SortDirection;
 }
 
+// Type สำหรับการทำ Multi-sort
+type SortDirection = 'asc' | 'desc';
+interface SortConfig {
+  key: keyof Coworking;
+  direction: SortDirection;
+}
+
 export default function AdminSpaces() {
   const [spaces, setSpaces] = useState<Coworking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // 🟢 State สำหรับสลับหน้า Active กับ Recycle Bin
-  const [viewMode, setViewMode] = useState<'active' | 'recycle'>('active');
-
-  // --- Search & Filter & Sort States ---
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [minPrice, setMinPrice] = useState<number | ''>('');
-  const [maxPrice, setMaxPrice] = useState<number | ''>('');
-  const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
-
-  // Pagination States
+  // Pagination States (เพิ่มใหม่)
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [isCustomRows, setIsCustomRows] = useState(false);
@@ -64,7 +58,7 @@ export default function AdminSpaces() {
   const [editing, setEditing] = useState(false);
   const [editingSpace, setEditingSpace] = useState<Coworking | null>(null);
 
-  // 🟢 รวม State ของการลบ (ใช้ Modal ตัวเดียว แต่คุม Action)
+  // States สำหรับ Delete Confirmation
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [spaceToProcess, setSpaceToProcess] = useState<Coworking | null>(null);
   const [deleteActionType, setDeleteActionType] = useState<'soft' | 'hard'>('soft');
@@ -94,137 +88,30 @@ export default function AdminSpaces() {
     }
   };
 
-  // --- Logic การกด Sort หัวตาราง ---
-  const handleSort = (key: keyof Coworking) => {
-    setSortConfigs((prev) => {
-      const existingIndex = prev.findIndex((config) => config.key === key);
-      
-      if (existingIndex >= 0) {
-        const currentDirection = prev[existingIndex].direction;
-        if (currentDirection === 'asc') {
-          const newConfigs = [...prev];
-          newConfigs[existingIndex].direction = 'desc';
-          return newConfigs;
-        } else {
-          return prev.filter((_, index) => index !== existingIndex);
-        }
-      } else {
-        return [...prev, { key, direction: 'asc' }];
-      }
-    });
+  // จัดการการปิด Modal
+  const closeAddModal = useCallback(() => {
+    setAddModalOpen(false);
+    setCreateError('');
+    setCreating(false);
+  }, []);
+
+  const closeEditModal = useCallback(() => {
+    setEditModalOpen(false);
+    setEditError('');
+    setEditing(false);
+    setEditingSpace(null);
+  }, []);
+
+  const openDeleteModal = (id: string) => {
+    setSpaceToDelete(id);
+    setDeleteModalOpen(true);
   };
 
-  // --- ประมวลผลข้อมูล (Search -> Filter -> Sort) ---
-  const processedSpaces = useMemo(() => {
-    // 🟢 0. แยก Active กับ Recycle Bin ออกจากกันก่อนทำอย่างอื่น
-    let result = spaces.filter(space => 
-      viewMode === 'active' ? !space.isDeleted : space.isDeleted
-    );
-
-    // 1. Search
-    if (searchTerm) {
-      const lowerQuery = searchTerm.toLowerCase();
-      result = result.filter(
-        (space) =>
-          space.name.toLowerCase().includes(lowerQuery) ||
-          space.address.toLowerCase().includes(lowerQuery)
-      );
-    }
-
-    // 2. Filter Type
-    if (filterType !== 'all') {
-      result = result.filter((space) => space.type === filterType);
-    }
-
-    // 3. Filter Status
-    if (filterStatus !== 'all') {
-      result = result.filter((space) => space.status === filterStatus);
-    }
-
-    // 4. Filter Price
-    if (minPrice !== '') {
-      result = result.filter((space) => space.price_per_hour >= Number(minPrice));
-    }
-    if (maxPrice !== '') {
-      result = result.filter((space) => space.price_per_hour <= Number(maxPrice));
-    }
-
-    // 5. Multi-column Sort
-    if (sortConfigs.length > 0) {
-      result.sort((a, b) => {
-        for (const config of sortConfigs) {
-          const { key, direction } = config;
-          const valA = a[key] ?? '';
-          const valB = b[key] ?? '';
-
-          if (typeof valA === 'string' && typeof valB === 'string') {
-            const comparison = valA.localeCompare(valB);
-            if (comparison !== 0) {
-              return direction === 'asc' ? comparison : -comparison;
-            }
-          } else if (typeof valA === 'number' && typeof valB === 'number') {
-            if (valA !== valB) {
-              return direction === 'asc' ? valA - valB : valB - valA;
-            }
-          }
-        }
-        return 0; // ถ้าเท่ากันหมดให้คงลำดับเดิม
-      });
-    }
-
-    return result;
-  }, [spaces, searchTerm, filterType, filterStatus, minPrice, maxPrice, sortConfigs, viewMode]);
-
-  // รีเซ็ตหน้ากลับไปหน้า 1 เสมอเมื่อมีการ Search หรือ Filter หรือ Sort
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterType, filterStatus, sortConfigs, viewMode]);
-
-  // --- Pagination Logic ---
-  const safeRowsPerPage = Math.max(1, rowsPerPage);
-  const totalPages = Math.ceil(processedSpaces.length / safeRowsPerPage);
-  
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [processedSpaces.length, totalPages, currentPage]);
-
-  const startIndex = (currentPage - 1) * safeRowsPerPage;
-  const endIndex = startIndex + safeRowsPerPage;
-  const displayedSpaces = processedSpaces.slice(startIndex, endIndex);
-
-  // Helper สำหรับแสดง Icon Sort บนหัวตาราง
-  const renderSortIcon = (key: keyof Coworking) => {
-    const config = sortConfigs.find((c) => c.key === key);
-    if (!config) return <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity" />;
-    return config.direction === 'asc' ? (
-      <ArrowUp className="w-4 h-4 text-primary" />
-    ) : (
-      <ArrowDown className="w-4 h-4 text-primary" />
-    );
-  };
-
-  const resetFilters = () => {
-    setSearchTerm('');
-    setFilterType('all');
-    setFilterStatus('all');
-    setMinPrice('');
-    setMaxPrice('');
-    setSortConfigs([]);
-  };
-
-  // Modals Actions...
-  const closeAddModal = useCallback(() => { setAddModalOpen(false); setCreateError(''); setCreating(false); }, []);
-  const closeEditModal = useCallback(() => { setEditModalOpen(false); setEditError(''); setEditing(false); setEditingSpace(null); }, []);
-  
-  // 🟢 ควบคุม Modal ลบ (ใช้ Modal เดิม แต่เปลี่ยนค่าที่ส่งเข้าไป)
-  const openDeleteModal = (space: Coworking, type: 'soft' | 'hard') => { 
-    setSpaceToProcess(space); 
-    setDeleteActionType(type); 
-    setDeleteModalOpen(true); 
-  };
-  const closeDeleteModal = useCallback(() => { setDeleteModalOpen(false); setSpaceToProcess(null); setIsDeleting(false); }, []);
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModalOpen(false);
+    setSpaceToDelete(null);
+    setIsDeleting(false);
+  }, []);
 
   // Keyboard events
   useEffect(() => {
@@ -243,12 +130,10 @@ export default function AdminSpaces() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addModalOpen, editModalOpen, deleteModalOpen, closeAddModal, closeEditModal, closeDeleteModal, totalPages]);
+  }, [addModalOpen, editModalOpen, deleteModalOpen, closeAddModal, closeEditModal, closeDeleteModal]);
 
-
- // ================= 🟢 ACTION HANDLERS =================
-  const confirmDeleteAction = async () => {
-    if (!spaceToProcess) return;
+  const confirmDelete = async () => {
+    if (!spaceToDelete) return;
     setIsDeleting(true);
     const token = localStorage.getItem('token');
 
@@ -270,31 +155,27 @@ export default function AdminSpaces() {
       
       fetchSpaces();
       closeDeleteModal();
-    } catch (err: any) {
-      setAlert({ message: 'Error: ' + (err.response?.data?.message || err.message), type: 'error' });
-      closeDeleteModal();
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleRestore = async (space: Coworking) => {
-    try {
-      const token = localStorage.getItem('token');
-      // 🟢 แก้ไข: ส่ง payload แบบปกติตรงๆ { isDeleted: false }
-      await axios.put(`${API_URL}/coworkings/${space._id}`, { isDeleted: false }, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
+      
+      setAlert({
+        message: 'Deleted successfully 🎉',
+        type: 'error' 
       });
-      fetchSpaces();
-      setAlert({ message: 'Space Restored Successfully 🎉', type: 'success' });
-    } catch (err: any) {
-      setAlert({ message: 'Failed to restore: ' + (err.response?.data?.message || err.message), type: 'error' });
-    }
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { message?: string } } };
+      console.error('Delete error:', err);
+      setAlert({
+        message: 'cannot delete: ' + (ax.response?.data?.message || 'An error occurred.'),
+        type: 'error'
+      });
+      closeDeleteModal();
+    } finally { setIsDeleting(false); }
   };
-  // =======================================================================
 
-  const openEditModal = (space: Coworking) => { setEditingSpace(space); setEditError(''); setEditModalOpen(true); };
+  const openEditModal = (space: Coworking) => {
+    setEditingSpace(space);
+    setEditError('');
+    setEditModalOpen(true);
+  };
 
   const handleCreateSpace = async (e: React.FormEvent<HTMLFormElement>) => { /* เดิม */ 
     e.preventDefault();
@@ -428,78 +309,6 @@ export default function AdminSpaces() {
         </div>
       )}
 
-      {/* --- Search & Filter Bar --- */}
-      <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-4 flex flex-col xl:flex-row gap-4">
-        
-        {/* ช่อง Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Search by name or address..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/60"
-          />
-        </div>
-        
-        {/* โซน Filters */}
-        <div className="flex flex-wrap items-center gap-4">
-          
-          <div className="flex items-center gap-2">
-            <input 
-              type="number" 
-              placeholder="Min ฿" 
-              value={minPrice}
-              min="0"
-              onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : '')}
-              className="w-24 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/60 text-sm"
-            />
-            <span className="text-gray-400">-</span>
-            <input 
-              type="number" 
-              placeholder="Max ฿" 
-              value={maxPrice}
-              min="0"
-              onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : '')}
-              className="w-24 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/60 text-sm"
-            />
-          </div>
-
-          <select 
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/60"
-          >
-            <option value="all">All Types</option>
-            <option value="desk">Desk</option>
-            <option value="room">Room</option>
-            <option value="meeting">Meeting Room</option>
-            <option value="private">Private Office</option>
-          </select>
-
-          <select 
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/60"
-          >
-            <option value="all">All Status</option>
-            <option value="available">Available</option>
-            <option value="unavailable">Unavailable</option>
-            <option value="maintenance">Maintenance</option>
-          </select>
-
-          {(searchTerm || filterType !== 'all' || filterStatus !== 'all' || minPrice !== '' || maxPrice !== '' || sortConfigs.length > 0) && (
-            <button 
-              onClick={resetFilters}
-              className="p-2 flex items-center justify-center rounded-lg border border-gray-300 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              title="Clear all filters & sorts"
-            >
-              <FilterX className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-      </div>
       <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl shadow-sm overflow-hidden">
         
         {/* --- Pagination Top/Bottom Controls --- */}
@@ -554,33 +363,18 @@ export default function AdminSpaces() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-background-light dark:bg-background-dark border-b border-border-light dark:border-border-dark">
-                <th onClick={() => handleSort('name')} className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors select-none w-2/5">
-                  <div className="flex items-center gap-2">Space Name {renderSortIcon('name')}</div>
-                </th>
-                <th onClick={() => handleSort('type')} className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors select-none">
-                  <div className="flex items-center gap-2">Type {renderSortIcon('type')}</div>
-                </th>
-                <th onClick={() => handleSort('price_per_hour')} className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors select-none">
-                  <div className="flex items-center gap-2">Price/Hour {renderSortIcon('price_per_hour')}</div>
-                </th>
-                <th onClick={() => handleSort('status')} className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark cursor-pointer group hover:bg-black/5 dark:hover:bg-white/5 transition-colors select-none">
-                  <div className="flex items-center gap-2">Status {renderSortIcon('status')}</div>
-                </th>
+                <th className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark">Space Name</th>
+                <th className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark">Type</th>
+                <th className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark">Price/Hour</th>
+                <th className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark">Status</th>
                 <th className="p-4 font-semibold text-text-muted-light dark:text-text-muted-dark text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {processedSpaces.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-text-muted-light dark:text-text-muted-dark">
-                      <Search className="w-12 h-12 mb-4 opacity-20" />
-                      <p className="text-lg font-medium">{viewMode === 'active' ? 'No spaces found' : 'Recycle Bin is empty'}</p>
-                      <p className="text-sm mt-1">Try adjusting your search or filters.</p>
-                      {(searchTerm || filterType !== 'all' || filterStatus !== 'all') && (
-                        <button onClick={resetFilters} className="mt-4 text-primary hover:underline">Clear all filters</button>
-                      )}
-                    </div>
+                  <td colSpan={5} className="p-8 text-center text-text-muted-light dark:text-text-muted-dark">
+                    No spaces found in the system
                   </td>
                 </tr>
               ) : (
@@ -588,7 +382,7 @@ export default function AdminSpaces() {
                   <tr key={space._id} className="border-b border-border-light dark:border-border-dark last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${viewMode === 'recycle' ? 'bg-red-500/10 text-red-500' : 'bg-primary/10 text-primary'}`}>
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                           <Building className="w-5 h-5" />
                         </div>
                         <div>
@@ -609,30 +403,20 @@ export default function AdminSpaces() {
                       </span>
                     </td>
                     <td className="p-4 text-right">
-                      
-                      {/* 🟢 ปุ่ม Action เปลี่ยนไปตาม View Mode */}
-                      {viewMode === 'active' ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => openEditModal(space)} className="p-2 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark" title="Edit">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          {/* เปิด Soft Delete Modal */}
-                          <button onClick={() => openDeleteModal(space, 'soft')} className="p-2 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark" title="Move to Recycle Bin">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => handleRestore(space)} className="p-2 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark" title="Restore Space">
-                            <ArchiveRestore className="w-5 h-5" />
-                          </button>
-                          {/* เปิด Hard Delete Modal */}
-                          <button onClick={() => openDeleteModal(space, 'hard')} className="p-2 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 rounded-lg transition-colors text-red-400" title="Permanently Delete">
-                            <Trash className="w-5 h-5" />
-                          </button>
-                        </div>
-                      )}
-
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => openEditModal(space)}
+                          className="p-2 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openDeleteModal(space._id)}
+                          className="p-2 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 rounded-lg transition-colors text-text-muted-light dark:text-text-muted-dark"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -641,6 +425,12 @@ export default function AdminSpaces() {
           </table>
         </div>
       </div>
+
+      {/* MODALS คงเดิมด้านล่าง (ตัดออกเพื่อให้เห็นภาพรวมสั้นลง แต่เวลาใช้งานจริงให้คง Modal ไว้เหมือนเดิมครับ) */}
+      {/* ... (Modal Create) ... */}
+      {/* ... (Modal Edit) ... */}
+      {/* ... (Modal Delete) ... */}
+
 
       {/* ================= MODAL เพิ่มข้อมูล (CREATE) ================= */}
       {addModalOpen && (

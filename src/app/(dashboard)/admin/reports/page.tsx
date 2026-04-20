@@ -19,7 +19,7 @@ export default function AdminReports() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">Revenue Overview</h2>
+              <h2 className="text-xl font-bold text-gray-900">Revenue Overview</h2>
               <div className="flex items-center gap-2 text-sm text-text-muted-light dark:text-text-muted-dark bg-background-light dark:bg-background-dark px-3 py-1.5 rounded-lg border border-border-light dark:border-border-dark">
                 <Calendar className="w-4 h-4" /> This Month
               </div>
@@ -70,6 +70,7 @@ export default function AdminReports() {
                   </div>
                 </div>
                 <div className="text-xl font-bold">$420</div>
+                 {/* test1 */}
               </div>
             </div>
           </div>
