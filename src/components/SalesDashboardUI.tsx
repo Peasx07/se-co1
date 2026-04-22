@@ -3,7 +3,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Calendar, ChevronDown, Loader2, Download, X } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Cell,
+} from 'recharts';
 
 interface SalesDashboardUIProps {
   role?: string;
@@ -16,11 +26,17 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
   const [loading, setLoading] = useState(false);
   const [salesData, setSalesData] = useState<any[]>([]);
   const [coworkingSpaces, setCoworkingSpaces] = useState<any[]>([]);
-  
+
+  // เปิด / ปิด กราฟ
+  const [showLine, setShowLine] = useState(true);
+  const [showBars, setShowBars] = useState(true);
+
   // Export modal state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
-  const [exportSort, setExportSort] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
+  const [exportSort, setExportSort] = useState<
+    'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
+  >('date-desc');
   const [exportLimit, setExportLimit] = useState<'10' | '50' | 'all' | 'custom'>('all');
   const [customLimit, setCustomLimit] = useState<string>('');
   const [exportData, setExportData] = useState<any[]>([]);
@@ -31,22 +47,6 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
 
   const years = ['2026', '2025', '2024'];
 
-  // Fetch coworking spaces on component mount
-  useEffect(() => {
-    const fetchCoworkingSpaces = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` }, withCredentials: true };
-        const res = await axios.get(`${API_URL}/coworkings`, config);
-        if (res.data.success) {
-          setCoworkingSpaces(res.data.data || []);
-        }
-      } catch (error) {
-        // Error fetching coworking spaces
-      }
-    };
-    fetchCoworkingSpaces();
-  }, [API_URL]);
   const months = [
     'All Year',
     'January',
@@ -60,26 +60,62 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
     'September',
     'October',
     'November',
-    'December'
+    'December',
   ];
 
-  // Fetch sales data when filters change
+  useEffect(() => {
+    const fetchCoworkingSpaces = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const config = {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        };
+        const res = await axios.get(`${API_URL}/coworkings`, config);
+        if (res.data.success) {
+          setCoworkingSpaces(res.data.data || []);
+        } else {
+          setCoworkingSpaces([]);
+        }
+      } catch (error) {
+        console.error('Error fetching coworking spaces:', error);
+        setCoworkingSpaces([]);
+      }
+    };
+
+    fetchCoworkingSpaces();
+  }, []);
+
   useEffect(() => {
     const fetchSalesData = async () => {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` }, withCredentials: true };
-        
-        // Convert month name to number for API (All Year = 'all')
-        const monthParam = selectedMonth === 'All Year' ? 'all' : (new Date(`${selectedMonth} 1, 2000`).getMonth() + 1).toString();
-        const coworkingParam = selectedCoworking === 'all' ? '' : `&coworking=${selectedCoworking}`;
-        const res = await axios.get(`${API_URL}/sales?year=${selectedYear}&month=${monthParam}${coworkingParam}`, config);
-        
+        const config = {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        };
+
+        const monthParam =
+          selectedMonth === 'All Year'
+            ? 'all'
+            : (new Date(`${selectedMonth} 1, 2000`).getMonth() + 1).toString();
+
+        const coworkingParam =
+          selectedCoworking === 'all' ? '' : `&coworking=${selectedCoworking}`;
+
+        const res = await axios.get(
+          `${API_URL}/sales?year=${selectedYear}&month=${monthParam}${coworkingParam}`,
+          config
+        );
+
         if (res.data.success) {
           setSalesData(res.data.data || []);
+        } else {
+          setSalesData([]);
         }
       } catch (error) {
+        console.error('Error fetching sales data:', error);
         setSalesData([]);
       } finally {
         setLoading(false);
@@ -87,47 +123,49 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
     };
 
     fetchSalesData();
-  }, [selectedYear, selectedMonth, selectedCoworking, API_URL]);
+  }, [selectedYear, selectedMonth, selectedCoworking]);
 
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const year = e.target.value;
-    setSelectedYear(year);
+    setSelectedYear(e.target.value);
   };
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const month = e.target.value;
-    setSelectedMonth(month);
+    setSelectedMonth(e.target.value);
   };
 
   const handleCoworkingChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const coworking = e.target.value;
-    setSelectedCoworking(coworking);
+    setSelectedCoworking(e.target.value);
   };
 
-  // Fetch detailed data for export
+  const chartData = salesData.map((item) => ({
+    ...item,
+    barValue: Number(item.total ?? 0),
+    lineValue: Number(item.total ?? 0),
+  }));
+
   const fetchExportData = async () => {
     setExportLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const config = { headers: { Authorization: `Bearer ${token}` }, withCredentials: true };
-      
-      // Fetch all reservations with coworking data
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
+      };
+
       const res = await axios.get(`${API_URL}/reservations`, config);
-      
+
       if (res.data.success) {
         let data = res.data.data || [];
-        
-        // Filter by year
+
         const startDate = new Date(`${selectedYear}-01-01`);
         const endDate = new Date(`${selectedYear}-12-31`);
         endDate.setHours(23, 59, 59, 999);
-        
+
         data = data.filter((item: any) => {
           const itemDate = new Date(item.date);
           return itemDate >= startDate && itemDate <= endDate;
         });
-        
-        // Filter by month if not "All Year"
+
         if (selectedMonth !== 'All Year') {
           const monthNum = new Date(`${selectedMonth} 1, 2000`).getMonth() + 1;
           data = data.filter((item: any) => {
@@ -135,30 +173,37 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
             return itemDate.getMonth() + 1 === monthNum;
           });
         }
-        
-        // Filter by coworking if not "all"
+
         if (selectedCoworking !== 'all') {
           data = data.filter((item: any) => {
-            // Handle both string and ObjectId formats
             const itemCoworkingId = item.coworking?._id || item.coworking;
             return String(itemCoworkingId) === String(selectedCoworking);
           });
         }
-        
-        // Calculate amount for each reservation
+
         data = data.map((item: any) => {
           let amount = 0;
-          if (item.coworking && item.coworking.price_per_hour && item.startTime && item.endTime) {
+
+          if (
+            item.coworking &&
+            item.coworking.price_per_hour &&
+            item.startTime &&
+            item.endTime
+          ) {
             const [startH, startM] = item.startTime.split(':').map(Number);
             const [endH, endM] = item.endTime.split(':').map(Number);
-            let hours = (endH + (endM / 60)) - (startH + (startM / 60));
+
+            let hours = (endH + endM / 60) - (startH + startM / 60);
             if (hours < 0) hours += 24;
             if (hours > 0) amount = hours * item.coworking.price_per_hour;
           }
+
           return { ...item, amount };
         });
-        
+
         setExportData(data);
+      } else {
+        setExportData([]);
       }
     } catch (error) {
       console.error('Error fetching export data:', error);
@@ -174,10 +219,8 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
   };
 
   const handleExport = () => {
-    // Apply sorting and limiting immediately before export
     let dataToExport = [...exportData];
-    
-    // Apply sorting
+
     dataToExport = dataToExport.sort((a: any, b: any) => {
       if (exportSort === 'date-desc') return new Date(b.date).getTime() - new Date(a.date).getTime();
       if (exportSort === 'date-asc') return new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -185,17 +228,20 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
       if (exportSort === 'amount-asc') return (a.amount || 0) - (b.amount || 0);
       return 0;
     });
-    
-    // Apply limit
-    let limitValue = exportLimit === 'all' ? dataToExport.length : (exportLimit === 'custom' ? parseInt(customLimit) || dataToExport.length : parseInt(exportLimit));
+
+    const limitValue =
+      exportLimit === 'all'
+        ? dataToExport.length
+        : exportLimit === 'custom'
+          ? parseInt(customLimit) || dataToExport.length
+          : parseInt(exportLimit);
+
     if (limitValue > 0 && limitValue < dataToExport.length) {
       dataToExport = dataToExport.slice(0, limitValue);
     }
-    
-    // Update export data with sorted/limited data for export functions
+
     setExportData(dataToExport);
-    
-    // Small delay to ensure state update before export
+
     setTimeout(() => {
       if (exportFormat === 'csv') {
         exportToCSV(dataToExport);
@@ -208,17 +254,18 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
 
   const exportToCSV = (data: any[] = exportData) => {
     const headers = ['Date/Month', 'Coworking Space Name', 'Total Sales'];
-    const rows = data.map(item => [
+    const rows = data.map((item) => [
       selectedMonth === 'All Year' ? item.date : item.date,
       item.coworking?.name || 'N/A',
-      item.amount?.toFixed(2) || '0'
+      item.amount?.toFixed(2) || '0',
     ]);
-    
+
     const totalRevenue = data.reduce((sum, item) => sum + (item.amount || 0), 0);
     rows.push(['', 'Total Revenue', totalRevenue.toFixed(2)]);
-    
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+
+    const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `sales-report-${selectedYear}-${selectedMonth}.csv`;
@@ -226,20 +273,20 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
   };
 
   const exportToPDF = (data: any[] = exportData) => {
-    // Create a printable PDF template
     const totalRevenue = data.reduce((sum, item) => sum + (item.amount || 0), 0);
+
     const generatedDate = new Date().toLocaleDateString('th-TH', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
-    
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('Please allow popups to print PDF');
       return;
     }
-    
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -304,7 +351,11 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
       <body>
         <div class="header">
           <h1>Sales Summary Report</h1>
-          <p>Selected Year/Month: ${selectedMonth === 'All Year' ? `All Year ${selectedYear}` : `${selectedMonth} ${selectedYear}`}</p>
+          <p>Selected Year/Month: ${
+            selectedMonth === 'All Year'
+              ? `All Year ${selectedYear}`
+              : `${selectedMonth} ${selectedYear}`
+          }</p>
           <p>Generated Date: ${generatedDate}</p>
         </div>
         <table>
@@ -316,29 +367,38 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
             </tr>
           </thead>
           <tbody>
-            ${data.map(item => `
+            ${data
+              .map(
+                (item) => `
               <tr>
                 <td>${selectedMonth === 'All Year' ? item.date : item.date}</td>
                 <td>${item.coworking?.name || 'N/A'}</td>
-                <td>฿${(item.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td>฿${(item.amount || 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}</td>
               </tr>
-            `).join('')}
+            `
+              )
+              .join('')}
             <tr class="total-row">
               <td colspan="2">Total Revenue</td>
-              <td>฿${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td>฿${totalRevenue.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}</td>
             </tr>
           </tbody>
         </table>
       </body>
       </html>
     `;
-    
+
     printWindow.document.write(htmlContent);
     printWindow.document.close();
     printWindow.print();
   };
 
-  // Only show for admin users
   if (role !== 'admin' && role !== 'Admin') {
     return null;
   }
@@ -352,17 +412,33 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
             Sales Dashboard Filters
           </h3>
         </div>
-        <button
-          onClick={handleExportClick}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
-        >
-          <Download className="w-4 h-4" />
-          Export Report
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowBars((prev) => !prev)}
+            className="flex items-center gap-2 px-4 py-2 border border-border-light dark:border-border-dark text-text-light dark:text-text-dark rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+          >
+            {showBars ? 'Hide Bars' : 'Show Bars'}
+          </button>
+
+          <button
+            onClick={() => setShowLine((prev) => !prev)}
+            className="flex items-center gap-2 px-4 py-2 border border-border-light dark:border-border-dark text-text-light dark:text-text-dark rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+          >
+            {showLine ? 'Hide Line' : 'Show Line'}
+          </button>
+
+          <button
+            onClick={handleExportClick}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+          >
+            <Download className="w-4 h-4" />
+            Export Report
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Year Filter */}
         <div className="relative">
           <label className="block text-sm font-medium text-text-muted-light dark:text-text-muted-dark mb-2">
             Year
@@ -383,7 +459,6 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
           </div>
         </div>
 
-        {/* Month Filter */}
         <div className="relative">
           <label className="block text-sm font-medium text-text-muted-light dark:text-text-muted-dark mb-2">
             Month
@@ -404,7 +479,6 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
           </div>
         </div>
 
-        {/* Co-working Space Filter */}
         <div className="relative">
           <label className="block text-sm font-medium text-text-muted-light dark:text-text-muted-dark mb-2">
             Co-working Space
@@ -427,16 +501,15 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
         </div>
       </div>
 
-      {/* Selected Filters Display */}
       <div className="mt-4 pt-4 border-t border-border-light dark:border-border-dark">
         <p className="text-xs text-text-muted-light dark:text-text-muted-dark">
-          Current Filter: <span className="font-medium text-text-light dark:text-text-dark">
+          Current Filter:{' '}
+          <span className="font-medium text-text-light dark:text-text-dark">
             {selectedMonth} {selectedYear}
           </span>
         </p>
       </div>
 
-      {/* Dynamic Sales Chart */}
       <div className="mt-6">
         <div className="flex justify-between items-center mb-4">
           <h4 className="text-sm font-semibold text-text-light dark:text-text-dark">
@@ -444,65 +517,125 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
           </h4>
           {loading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
         </div>
-        
+
         <div className="w-full h-96 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : salesData.length > 0 ? (
+          ) : chartData.length > 0 && (showBars || showLine) ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: '#d1d5db' }} 
-                  dy={10} 
-                  interval={0} 
+              <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="rgba(255, 255, 255, 0.06)"
                 />
-                <YAxis 
+
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#d1d5db' }}
+                  dy={10}
+                  interval={0}
+                />
+
+                <YAxis
                   tick={{ fontSize: 12, fill: '#d1d5db' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(value) => `฿${(value / 1000).toFixed(0)}k`}
                 />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} 
+
+                <Tooltip
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
+                      const barValue = Number(
+                        payload.find((p: any) => p.dataKey === 'barValue')?.value ?? 0
+                      );
+                      const lineValue = Number(
+                        payload.find((p: any) => p.dataKey === 'lineValue')?.value ?? 0
+                      );
+
                       return (
                         <div className="bg-gray-800 dark:bg-gray-800 border border-gray-600 px-3 py-2 rounded-lg shadow-xl">
-                          <p className="text-sm font-bold text-white">
-                            ฿{payload[0].value?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                          {showBars && (
+                            <p className="text-sm font-bold text-white">
+                              Bar: ฿
+                              {barValue.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </p>
+                          )}
+                          {showLine && (
+                            <p className="text-sm font-bold text-yellow-300">
+                              Line: ฿
+                              {lineValue.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-1">
+                            {payload[0].payload?.name}
                           </p>
-                          <p className="text-xs text-gray-400">{payload[0].payload?.name}</p>
                         </div>
                       );
                     }
                     return null;
                   }}
                 />
-                <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                  {salesData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill="#ea580c" 
-                      className="transition-all duration-300 hover:opacity-80" 
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
+
+                {showBars && (
+                  <Bar dataKey="barValue" radius={[4, 4, 0, 0]} barSize={42}>
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill="#ea580c"
+                        className="transition-all duration-300 hover:opacity-80"
+                      />
+                    ))}
+                  </Bar>
+                )}
+
+                {showLine && (
+                  <Line
+                    type="linear"
+                    dataKey="lineValue"
+                    stroke="#facc15"
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: '#facc15',
+                      stroke: '#111827',
+                      strokeWidth: 2,
+                    }}
+                    activeDot={{
+                      r: 6,
+                      fill: '#ffffff',
+                      stroke: '#facc15',
+                      strokeWidth: 2,
+                    }}
+                    connectNulls
+                  />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full text-text-muted-light dark:text-text-muted-dark">
-              <p className="text-sm">No sales data available for the selected period</p>
+              <p className="text-sm">
+                {!chartData.length
+                  ? 'No sales data available for the selected period'
+                  : 'Both chart types are hidden'}
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Export Modal */}
       {isExportModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-surface-light dark:bg-surface-dark rounded-2xl p-6 w-full max-w-md shadow-xl">
@@ -518,7 +651,6 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
               </button>
             </div>
 
-            {/* Format Selection */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-text-muted-light dark:text-text-muted-dark mb-2">
                 Format
@@ -547,7 +679,6 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
               </div>
             </div>
 
-            {/* Sorting Options */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-text-muted-light dark:text-text-muted-dark mb-2">
                 Sort By
@@ -564,7 +695,6 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
               </select>
             </div>
 
-            {/* Row Limit */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-text-muted-light dark:text-text-muted-dark mb-2">
                 Row Limit
@@ -592,7 +722,6 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
               )}
             </div>
 
-            {/* Actions */}
             <div className="flex gap-3">
               <button
                 onClick={() => setIsExportModalOpen(false)}
@@ -611,6 +740,8 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
           </div>
         </div>
       )}
+
+      <div ref={pdfRef} className="hidden" />
     </div>
   );
 }
