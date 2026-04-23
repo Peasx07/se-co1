@@ -11,7 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const location = usePathname();
   const isAdmin = location?.includes('/admin');
 
-  // 🌟 1. สร้างตัวแปร URL โดยดึงจาก Environment 
+  // 🌟 1. สร้างตัวแปร URL โดยดึงจาก Environment ant
   // (แก้ลิงก์ข้างล่างนี้ให้ตรงกับ URL Render ของคุณด้วยนะครับ)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-august-pen-gay.onrender.com/api/v1';
 
