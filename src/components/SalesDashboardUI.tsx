@@ -139,9 +139,14 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
 
   const chartData = salesData.map((item) => ({
     ...item,
-    barValue: Number(item.total ?? 0),
-    lineValue: Number(item.total ?? 0),
+    barValue: Math.max(0, Number(item.total ?? 0)),
+    lineValue: Math.max(0, Number(item.total ?? 0)),
   }));
+
+  const formatYAxisCurrency = (value: number) => {
+    if (Math.abs(value) < 1000) return `฿${Math.round(value)}`;
+    return `฿${(value / 1000).toFixed(1)}k`;
+  };
 
   const fetchExportData = async () => {
     setExportLoading(true);
@@ -545,7 +550,10 @@ export default function SalesDashboardUI({ role }: SalesDashboardUIProps) {
                   tick={{ fontSize: 12, fill: '#d1d5db' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(value) => `฿${(value / 1000).toFixed(0)}k`}
+                  tickCount={8}
+                  minTickGap={10}
+                  domain={[0, 'auto']}
+                  tickFormatter={formatYAxisCurrency}
                 />
 
                 <Tooltip
