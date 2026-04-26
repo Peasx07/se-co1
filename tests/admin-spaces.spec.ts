@@ -15,13 +15,14 @@ test.describe.serial('EPIC 1: Co-working Space Management', () => {
     await page.locator('input[type="email"]').fill('admin@gmail.com');
     await page.locator('input[type="password"]').fill('12345678');
 
+    // 1. กดปุ่ม Login ได้เลยโดยไม่ต้องใส่ Promise.all
     await page.getByRole('button', { name: /login|sign in|เข้าสู่ระบบ/i }).click();
 
-    // รอ redirect หลัง login
-    await page.waitForURL('**/admin/**');
+    // 2. ให้ Playwright รอเช็กว่าหน้าเว็บเปลี่ยน URL ไปที่ Dashboard สำเร็จหรือไม่ 
+    // (ถ้าล็อกอินไม่ผ่าน มันจะฟ้องพังที่บรรทัดนี้ทันที ไม่ต้องรอนานถึง 30 วิ)
+    await expect(page).toHaveURL(/.*\/admin.*/, { timeout: 10000 });
 
-    await page.goto(`${BASE_URL}/admin/spaces`);
-    await expect(page.getByText(/spaces/i)).toBeVisible();
+    await page.goto(`${BASE_URL}/admin/spaces`, { waitUntil: 'networkidle' });
 
     await expect(page.getByText('Spaces Management')).toBeVisible();
     await expect(page.getByRole('button', { name: /add space/i })).toBeVisible();

@@ -17,15 +17,16 @@ test.describe.serial('EPIC 2: Additional Dashboard Features', () => {
     await page.locator('input[type="password"]').fill('12345678');
 
     // 4. รอให้ Login สำเร็จและย้ายไปหน้า Admin Dashboard
+    // 1. กดปุ่ม Login ได้เลยโดยไม่ต้องใส่ Promise.all
     await page.getByRole('button', { name: /login|sign in|เข้าสู่ระบบ/i }).click();
 
-    // รอ redirect หลัง login
-    await page.waitForURL('**/admin/**');
+    // 2. ให้ Playwright รอเช็กว่าหน้าเว็บเปลี่ยน URL ไปที่ Dashboard สำเร็จหรือไม่ 
+    // (ถ้าล็อกอินไม่ผ่าน มันจะฟ้องพังที่บรรทัดนี้ทันที ไม่ต้องรอนานถึง 30 วิ)
+    await expect(page).toHaveURL(/.*\/admin.*/, { timeout: 10000 });
 
     // 5. ไปหน้า Dashboard (ถ้า Login แล้วไม่เด้งมาหน้านี้อัตโนมัติ)
     // **หมายเหตุ: เปลี่ยน Path ให้ตรงกับที่คุณตั้งไว้ใน Next.js (เช่น /admin หรือ /admin/dashboard)**
-    await page.goto(`${BASE_URL}/admin/spaces`);
-await expect(page.getByText(/spaces/i)).toBeVisible();
+    await page.goto(`${BASE_URL}/admin`, { waitUntil: 'networkidle' });
 
     // ยืนยันว่าหน้า Dashboard โหลดเสร็จ (ดูจาก Header)
     await expect(page.getByText('Dashboard Overview')).toBeVisible({ timeout: 15000 });
@@ -67,10 +68,10 @@ await expect(page.getByText(/spaces/i)).toBeVisible();
     await yearSelect.selectOption('2025');
 
     // 5. รอให้ API โหลดข้อมูลและ UI อัปเดตสักแป๊บ
-    await page.waitForTimeout(1000);
+    // ลบบรรทัดนี้ทิ้ง -> await page.waitForTimeout(1000);
 
-    // 6. ตรวจสอบว่าข้อความด้านล่างเปลี่ยนเป็นปี 2025 สำเร็จ
-    await expect(page.getByText('Current Filter: All Year 2025')).toBeVisible();
+// Playwright จะรอดักเช็กให้เอง (สูงสุด 10 วิ) ถ้าระบบโหลดเสร็จก่อน มันจะไปบรรทัดต่อไปทันที
+await expect(page.getByText('Current Filter: All Year 2025')).toBeVisible({ timeout: 10000 });
   });
 
   // --- US2-3: Export data to PDF ---
@@ -107,12 +108,10 @@ await expect(page.getByText(/spaces/i)).toBeVisible();
     await page.getByText('Sales Dashboard Filters').scrollIntoViewIfNeeded();
 
     // 2. เผื่อเวลาให้ Recharts คำนวณขนาดและดึงข้อมูลมาวาดกราฟ
-    await page.waitForTimeout(1500);
-
     // 3. ตรวจสอบว่ากราฟถูกวาดขึ้นมาแล้วจริงๆ 
     // (Recharts จะสร้างแท็ก <svg> ที่มีคลาส "recharts-surface" เสมอ)
     const chartSvg = page.locator('svg.recharts-surface').first();
-    await expect(chartSvg).toBeVisible();
+    await expect(chartSvg).toBeVisible({ timeout: 10000 });
 
     // 4. ลองคลิกหรือ Hover ที่ "แท่งกราฟ" แท่งแรก
     // (Recharts จะใช้คลาส "recharts-bar-rectangle" สำหรับกราฟแท่ง)
