@@ -15,12 +15,13 @@ test.describe.serial('EPIC 1: Co-working Space Management', () => {
     await page.locator('input[type="email"]').fill('admin@gmail.com');
     await page.locator('input[type="password"]').fill('12345678');
 
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle' }),
-      page.getByRole('button', { name: /login|sign in|เข้าสู่ระบบ/i }).click(),
-    ]);
+    await page.getByRole('button', { name: /login|sign in|เข้าสู่ระบบ/i }).click();
 
-    await page.goto(`${BASE_URL}/admin/spaces`, { waitUntil: 'networkidle' });
+    // รอ redirect หลัง login
+    await page.waitForURL('**/admin/**');
+
+    await page.goto(`${BASE_URL}/admin/spaces`);
+    await expect(page.getByText(/spaces/i)).toBeVisible();
 
     await expect(page.getByText('Spaces Management')).toBeVisible();
     await expect(page.getByRole('button', { name: /add space/i })).toBeVisible();
