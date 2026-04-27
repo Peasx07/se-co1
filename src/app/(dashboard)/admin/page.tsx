@@ -8,13 +8,14 @@ import {
   Users, Calendar, CreditCard, Activity, ArrowUpRight, ArrowDownRight, 
   MoreVertical, Download, Filter, Banknote, CalendarCheck, Building, 
   UserPlus, CalendarPlus, Receipt, BarChart as BarChartIcon, X, Loader2, Edit, Trash2,
-  ArrowUpDown 
+  ArrowUpDown, Minus
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import SalesDashboardUI from '@/components/SalesDashboardUI';
 
 export default function Admin() {
   const [stats, setStats] = useState({ revenue: 0, members: 0, bookingsToday: 0, occupancy: 0 });
+  const [trends, setTrends] = useState({ revenue: 0, members: 0, bookingsToday: 0, occupancy: 0 });
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [isViewAllOpen, setIsViewAllOpen] = useState(false);
   const [monthlyRevenueData, setMonthlyRevenueData] = useState<any[]>([]);
@@ -55,6 +56,12 @@ export default function Admin() {
       if (res.data.success) {
          const dbStats = res.data.data;
          setStats({ revenue: dbStats.revenue, members: dbStats.members, bookingsToday: dbStats.bookingsToday, occupancy: dbStats.occupancy });
+         setTrends({
+          revenue: dbStats.trends?.revenue ?? 0,
+          members: dbStats.trends?.members ?? 0,
+          bookingsToday: dbStats.trends?.bookingsToday ?? 0,
+          occupancy: dbStats.trends?.occupancy ?? 0
+         });
          setAllTransactions(dbStats.recentTransactions); 
          setMonthlyRevenueData(dbStats.monthlyRevenue || []);
       }
@@ -212,6 +219,15 @@ export default function Admin() {
     endTime: item.endTime || 'N/A',
   }));
   const pdfRows = filteredTransactions.slice(0, 1000);
+  const formatTrend = (value: number) => {
+    const safeValue = Number.isFinite(value) ? value : 0;
+    const rounded = Math.abs(safeValue).toFixed(1);
+    return `${safeValue >= 0 ? '+' : '-'}${rounded}%`;
+  };
+  const getTrendState = (value: number): 'positive' | 'negative' | 'neutral' => {
+    if (!Number.isFinite(value) || value === 0) return 'neutral';
+    return value > 0 ? 'positive' : 'negative';
+  };
 
   const handleConfirmExport = async () => {
     if (selectedExportType === 'csv') {
@@ -230,10 +246,10 @@ export default function Admin() {
   };
 
   const statCards = [
-    { title: 'Total Revenue', value: `฿${stats.revenue.toLocaleString(undefined, {minimumFractionDigits: 2})}`, change: '+12.5%', icon: Banknote, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { title: 'Active Members', value: stats.members.toLocaleString(), change: '+5.2%', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Bookings Today', value: stats.bookingsToday.toLocaleString(), change: '+2.1%', icon: CalendarCheck, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { title: 'Space Occupancy', value: `${stats.occupancy}%`, change: stats.occupancy > 50 ? '+1.5%' : '-2.4%', icon: Building, color: 'text-orange-500', bg: 'bg-orange-500/10', negative: stats.occupancy < 50 },
+    { title: 'Total Revenue', value: `฿${stats.revenue.toLocaleString(undefined, {minimumFractionDigits: 2})}`, change: formatTrend(trends.revenue), icon: Banknote, color: 'text-emerald-500', bg: 'bg-emerald-500/10', negative: trends.revenue < 0 },
+    { title: 'Active Members', value: stats.members.toLocaleString(), change: formatTrend(trends.members), icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10', negative: trends.members < 0 },
+    { title: 'Bookings Today', value: stats.bookingsToday.toLocaleString(), change: formatTrend(trends.bookingsToday), icon: CalendarCheck, color: 'text-purple-500', bg: 'bg-purple-500/10', negative: trends.bookingsToday < 0 },
+    { title: 'Space Occupancy', value: `${stats.occupancy}%`, change: formatTrend(trends.occupancy), icon: Building, color: 'text-orange-500', bg: 'bg-orange-500/10', negative: trends.occupancy < 0 },
   ];
 
   if (loading) return <div className="flex justify-center items-center h-[70vh]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -520,8 +536,21 @@ export default function Admin() {
             <div key={i} className="bg-surface-light dark:bg-surface-dark p-6 rounded-2xl border border-border-light dark:border-border-dark shadow-sm">
               <div className="flex justify-between items-start mb-4">
                 <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}><stat.icon className="w-6 h-6" /></div>
-                <div className={`flex items-center gap-1 text-sm font-medium px-2.5 py-1 rounded-full ${stat.negative ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                  {stat.negative ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />} {stat.change}
+                <div className={`flex items-center gap-1 text-sm font-medium px-2.5 py-1 rounded-full ${
+                  getTrendState(parseFloat(stat.change)) === 'negative'
+                    ? 'bg-red-500/10 text-red-500'
+                    : getTrendState(parseFloat(stat.change)) === 'neutral'
+                    ? 'bg-gray-500/10 text-gray-400'
+                    : 'bg-emerald-500/10 text-emerald-500'
+                }`}>
+                  {getTrendState(parseFloat(stat.change)) === 'negative' ? (
+                    <ArrowDownRight className="w-4 h-4" />
+                  ) : getTrendState(parseFloat(stat.change)) === 'neutral' ? (
+                    <Minus className="w-4 h-4" />
+                  ) : (
+                    <ArrowUpRight className="w-4 h-4" />
+                  )}{' '}
+                  {getTrendState(parseFloat(stat.change)) === 'neutral' ? 'เท่าเดิม' : stat.change}
                 </div>
               </div>
               <h3 className="text-text-muted-light dark:text-text-muted-dark font-medium text-sm mb-1">{stat.title}</h3>
